@@ -5,4 +5,6 @@ node_modules/
 dist/
 out/
 coverage/
+dist-types/
+*.tsbuildinfo
 *.vsix

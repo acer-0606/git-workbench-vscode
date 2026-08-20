@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/domain" },
+    { "path": "./packages/protocol" },
+    { "path": "./packages/config" },
+    { "path": "./packages/git-cli" },
+    { "path": "./packages/transactions" },
+    { "path": "./packages/testkit" },
+    { "path": "./tsconfig.extension.json" }
+  ]
+}

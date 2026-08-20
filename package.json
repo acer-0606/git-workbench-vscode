@@ -1,0 +1,48 @@
+{
+  "name": "git-workbench",
+  "displayName": "Git Workbench",
+  "publisher": "git-workbench-project",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.cjs",
+  "workspaces": [
+    "packages/*",
+    "webview/*"
+  ],
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "check": "npm run typecheck && npm run test:unit",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest",
+    "test:unit": "vitest run tests packages src --exclude tests/integration/** --exclude tests/vscode/**",
+    "test:integration": "vitest run tests/integration --pool=forks --maxWorkers=1",
+    "build:vscode-tests": "tsc -p tests/vscode/tsconfig.json",
+    "test:vscode": "npm run build:vscode-tests && node tests/vscode/out/run.js",
+    "sync:settings": "node scripts/sync-settings.mjs",
+    "package": "npm run sync:settings && npm run check && npm run build && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "20.19.43",
+    "@types/vscode": "1.96.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.8.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^4.1.11"
+  }
+}
