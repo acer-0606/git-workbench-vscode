@@ -1,0 +1,7 @@
+.superpowers/
+outputs/
+node_modules/
+dist/
+out/
+coverage/
+*.vsix
