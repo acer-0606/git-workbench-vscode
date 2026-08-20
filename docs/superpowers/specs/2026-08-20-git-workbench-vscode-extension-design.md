@@ -1,7 +1,7 @@
 # Git Workbench VS Code 扩展设计规格
 
 - 日期：2026-08-20
-- 状态：设计自审已批准，可进入实施计划；不等同于实现或发布批准
+- 状态：设计与实施计划自审已批准，可进入分阶段实现；不等同于实现或发布批准
 - 工作名称：Git Workbench
 - 配置命名空间：`gitWorkbench.*`
 - 目标平台：macOS、Windows、Linux，以及 VS Code Remote SSH、WSL、Dev Containers
@@ -274,9 +274,9 @@ V1.x 可增加托管平台、AI、团队共享、Stacked Branch、高级 Submodu
 | `gitWorkbench.graph.maxLanes` | `50` | `resource` | 同时绘制的最大分支轨道数，范围 8–200；超过后折叠远轨道以限制布局成本。 |
 | `gitWorkbench.graph.order` | `"topo"` | `resource` | `topo` 保持拓扑；`date` 按提交时间；`authorDate` 按作者时间。 |
 | `gitWorkbench.graph.showWorkingTree` | `true` | `resource` | 在日志图顶部显示 Working Tree、Index 和未提交修改节点。 |
-| `gitWorkbench.graph.showRemoteBranches` | `true` | `resource` | 显示远端跟踪分支。 |
-| `gitWorkbench.graph.showTags` | `true` | `resource` | 显示 Tag。 |
-| `gitWorkbench.graph.showStashes` | `true` | `resource` | 显示 Stash。 |
+| `gitWorkbench.graph.showRemoteBranches` | `true` | `resource` | 是否在日志图与引用列表中显示远端跟踪分支；关闭只隐藏展示，不删除或修改 Ref。 |
+| `gitWorkbench.graph.showTags` | `true` | `resource` | 是否在日志图与引用列表中显示 Tag；关闭只隐藏展示，不删除或修改 Tag。 |
+| `gitWorkbench.graph.showStashes` | `true` | `resource` | 是否在日志图与引用列表中显示 Stash；关闭只隐藏展示，不删除或弹出 Stash。 |
 | `gitWorkbench.graph.showWorktrees` | `true` | `resource` | 显示关联 Worktree 及其脏状态。 |
 
 ### 8.3 比较与应用
@@ -312,6 +312,7 @@ V1.x 可增加托管平台、AI、团队共享、Stacked Branch、高级 Submodu
 | `gitWorkbench.safety.publishedRewrite` | `"confirm"` | `resource` | `deny` 禁止已发布历史改写；`confirm` 展示影响、二次确认并只允许精确 Lease。运行时读取各层并取更严格值，无“始终允许”。 |
 | `gitWorkbench.safety.checkpointRetentionDays` | `30` | `machine` | 恢复检查点保留天数，范围 1–365；只清理当前本机或 Remote 环境中的插件内部恢复数据。 |
 | `gitWorkbench.safety.checkpointMaxCount` | `50` | `machine` | 每仓库恢复检查点上限，范围 5–500；超过后清理最旧且未固定的检查点。 |
+| `gitWorkbench.safety.checkpointMaxDiskMB` | `2048` | `machine` | 当前 Extension Host 的恢复数据总上限，范围 256–102400 MB。固定或活跃检查点不自动删除；空间不足时阻止新的危险操作并打开恢复中心，而不是创建不完整快照。 |
 
 ### 8.6 性能与诊断
 
@@ -429,7 +430,7 @@ Query 被取消不改变仓库。未知解析字段被忽略并记录兼容性�
 
 - `repositoryGeneration`。
 - HEAD OID、当前 Branch/Symref 和目标 Ref OID。
-- Index Fingerprint；存在 Unmerged Stage 时使用完整 Stage 列表指纹。
+- Index 完整二进制 Fingerprint（含 split-index 引用及 flags）；存在 Unmerged Stage 时同时保存完整 Stage 列表用于语义校验。
 - PausedOperation 类型与步骤。
 - 受影响文件的 Content Hash、Mode、存在状态。
 - 已打开文档的 `TextDocument.version` 和 Dirty 状态。
@@ -438,11 +439,13 @@ Query 被取消不改变仓库。未知解析字段被忽略并记录兼容性�
 
 ### 11.2 仓库级调度
 
-- 每仓库最多一个写操作。
+- 每个 Common Git Dir 最多一个插件写操作；同一 Extension Host 先用公平内存队列排序，再用 Common Git Dir 下的插件私有原子目录租约跨 VS Code 窗口/进程互斥。Linked Worktree 虽有不同 UI Repository ID，所有写操作仍按共享 `commonRepositoryId` 串行，避免并发修改共享 Refs/Object Store。租约不冒充 Git Lock，外部 Git 并发仍由版本向量、Git 自身 Lock 和后置校验防护。
 - 每仓库最多两个读操作；全局默认最多四个。
 - 写操作优先于新后台读请求。
 - 不抢占外部 `index.lock`，不删除未知 Lock。
 - 外部 Git 操作导致状态变化时，当前计划返回 `STALE_PLAN`。
+
+Ref/Object/Config 变化递增同一 `commonRepositoryId` 下全部 Worktree 的 generation；Index/Working Tree 文件变化只递增对应 Worktree generation。Mutation Plan 同时保存两级 generation，不能用某个 Worktree 的局部缓存掩盖共享 Ref 已变化。
 
 ### 11.3 保证等级
 
@@ -472,16 +475,17 @@ Query 被取消不改变仓库。未知解析字段被忽略并记录兼容性�
 ### 12.1 存储
 
 - Ref 状态使用 `refs/git-workbench/recovery/<operation-id>/<label>`，通过 expected old OID 安全创建。
+- `refs/git-workbench/**` 是内部恢复命名空间，只在 Recovery Center 可见；普通 DAG、Refs Tree、ahead/behind、published 判断、Push 选择器和用户 Ref 搜索必须显式排除。
 - 受影响的 Dirty/Untracked 文件使用二进制安全、内容寻址的本地恢复快照。
 - Journal、快照和索引保存在 Extension `globalStorageUri` 的仓库哈希目录；Remote 场景存于远端 Extension Host。
 - 恢复数据不参与 Settings Sync、不上传网络；POSIX 环境使用仅当前用户可读写权限，Windows 使用当前用户 ACL。恢复快照包含源码且不承诺额外的应用层加密，UI 必须公开存储位置、保留策略和立即清理入口。
-- 清理由保留天数和每仓库数量共同控制；固定的检查点不自动清理。
+- 清理由保留天数、每仓库数量和当前 Extension Host 的全局磁盘上限共同控制；固定或活跃的检查点不自动清理。无法在不触碰固定/活跃数据的前提下腾出完整快照空间时，危险操作在执行前失败并打开恢复中心。
 
 ### 12.2 Journal 状态
 
 `Planned → Preflight → Checkpointed → Running → Paused/Verifying → Committed`
 
-失败分支为 `RollingBack → RolledBack` 或 `NeedsAttention`。每次状态变更采用临时文件写入、Flush 和原子 Rename。启动时不只相信 Journal，而是读取 HEAD、Refs、Index 和 Git 操作标记进行 Reconcile。
+尚未启动 Provider 的过期计划以 `Rejected` 终结，安全取消以 `Cancelled` 终结；失败分支为 `RollingBack → RolledBack` 或 `NeedsAttention`。每次状态变更采用同目录临时文件写入、Flush 和原子发布（Rename 或 no-replace hard link），绝不覆盖已有的不同序列记录。启动时不只相信 Journal，而是读取 HEAD、Refs、Index 和 Git 操作标记进行 Reconcile。
 
 ### 12.3 恢复中心
 
@@ -499,6 +503,7 @@ Query 被取消不改变仓库。未知解析字段被忽略并记录兼容性�
 - `AUTH_REQUIRED`：系统凭据交互未完成。
 - `UNSUPPORTED_GIT_CAPABILITY`：当前 Git 缺少能力。
 - `PARSER_UNSUPPORTED`：关键机器输出无法安全解析。
+- `MISSING_LOCAL_OBJECT`：Partial Clone 所需对象尚未在本地；只允许用户显式获取，查询本身不得暗中联网。
 - `TOO_LARGE`：内容超过交互预算。
 - `CORRUPT_REPOSITORY`：对象、Index 或 Ref 损坏。
 - `CANCELLED`：只读任务安全取消。
@@ -524,7 +529,7 @@ Query 被取消不改变仓库。未知解析字段被忽略并记录兼容性�
 
 ### 14.1 Workspace Trust
 
-Manifest 声明 `untrustedWorkspaces.supported: "limited"`。未信任工作区只提供受限只读浏览；禁用写、网络、Hooks、外部 Diff/TextConv、FSMonitor 和工作区自定义可执行路径。相关 Settings 加入 `restrictedConfigurations`。
+Manifest 声明 `untrustedWorkspaces.supported: "limited"`。未信任工作区只提供 Commit/Ref/Object 元数据和 Commit↔Commit 的受限只读浏览；禁用写、网络、Hooks、外部 Diff/TextConv、FSMonitor、Clean/Smudge/Process Filter 和工作区自定义可执行路径。由于 Working Tree/Index Status 或 Diff 可能按 `.gitattributes` 调用 `filter.*.clean/process`，未信任时不运行这些命令，也不读取 Untracked 内容；相应区域显示“信任后检查工作区”。相关 Settings 加入 `restrictedConfigurations`。
 
 ### 14.2 命令与路径安全
 
@@ -582,7 +587,7 @@ Manifest 声明 `untrustedWorkspaces.supported: "limited"`。未信任工作区�
 - Git 正式支持基线：`>= 2.35.3`。更旧或仅由发行版回移安全补丁的构建可以进入能力探测后的兼容只读模式，但不属于 V1 写操作支持矩阵。
 - 启动时探测具体 Git Capability，不以版本字符串猜测功能。
 - macOS：Apple Silicon、Intel，大小写敏感/不敏感文件系统。
-- Windows：Windows 10/11、Git for Windows、长路径、盘符、UNC、CRLF。
+- Windows：VS Code 当前官方支持的 64 位 Windows Client（发布时冻结精确版本矩阵，不单独承诺已 EOL 的普通 Windows 10）、Git for Windows、长路径、盘符、UNC、CRLF。
 - Linux：Ubuntu/Debian、RHEL 系、Alpine Container，x64/arm64。
 - Remote：WSL2、Remote SSH、Debian/Alpine Dev Container。
 - Repository：普通、Shallow、Partial Clone、Sparse Checkout、Worktree、Submodule、LFS、Detached HEAD、Unborn Branch、SHA-1/SHA-256。
@@ -654,12 +659,12 @@ V1 是完整产品目标，但不能作为一个不可分割的大改动实现�
 
 ## 21. 设计审批结论
 
-**结论：批准进入实施计划（Approved for Implementation Planning）。**
+**结论：批准进入分阶段实现（Approved for Phased Implementation）。**
 
-- 审批日期：2026-08-20
+- 审批日期：2026-08-21（安全与实施一致性复审）
 - 审批方式：Codex 独立自审
 - 阻断项：0
-- 批准范围：产品交互、V1 功能边界、技术架构、安全与恢复模型、Settings 合同、性能预算和发布门槛
+- 批准范围：产品交互、V1 功能边界、技术架构、安全与恢复模型、Settings 合同、性能预算、发布门槛，以及六份分阶段实施计划
 - 不在批准范围：实现代码质量、三平台实际兼容性、性能实测和发布质量；这些必须由第 17、19 节的测试与发布门槛另行证明
 
 审批证据：
@@ -667,7 +672,8 @@ V1 是完整产品目标，但不能作为一个不可分割的大改动实现�
 | 检查项 | 结果 |
 |---|---|
 | 原始需求逐项映射 | 16/16 通过 |
-| Settings 配置合同 | 37 项，名称唯一，均有默认值、精确作用域和 Settings 描述 |
+| Settings 配置合同 | 38 项，名称唯一，均有默认值、精确作用域和 Settings 描述 |
+| 分阶段实施计划 | 6 份，51 个 Task、252 个可勾选 Step、51 个任务级 Commit；编号、代码围栏与提交边界检查通过 |
 | 章节与 Markdown 结构 | 21/21 连续，`git diff --check` 通过 |
 | 纯文本多文档编辑保证 | 与 [VS Code `workspace.applyEdit`](https://code.visualstudio.com/api/references/vscode-api#workspace.applyEdit) 的 text-only all-or-nothing 边界一致 |
 | Settings 作用域 | 与 [VS Code Configuration Scopes](https://code.visualstudio.com/api/references/contribution-points#contributes.configuration) 一致 |
