@@ -1,7 +1,7 @@
 # Git Workbench VS Code 扩展设计规格
 
 - 日期：2026-08-20
-- 状态：交互与架构设计已确认，等待规格文档评审
+- 状态：设计自审已批准，可进入实施计划；不等同于实现或发布批准
 - 工作名称：Git Workbench
 - 配置命名空间：`gitWorkbench.*`
 - 目标平台：macOS、Windows、Linux，以及 VS Code Remote SSH、WSL、Dev Containers
@@ -652,6 +652,34 @@ V1 是完整产品目标，但不能作为一个不可分割的大改动实现�
 | 失败鲁棒性 | Typed Errors、Journal、Reconcile、故障注入、禁止盲重试 |
 | VS Code Settings | 完整配置合同与工作台会话级快捷覆盖 |
 
-## 21. 设计完成判定
+## 21. 设计审批结论
+
+**结论：批准进入实施计划（Approved for Implementation Planning）。**
+
+- 审批日期：2026-08-20
+- 审批方式：Codex 独立自审
+- 阻断项：0
+- 批准范围：产品交互、V1 功能边界、技术架构、安全与恢复模型、Settings 合同、性能预算和发布门槛
+- 不在批准范围：实现代码质量、三平台实际兼容性、性能实测和发布质量；这些必须由第 17、19 节的测试与发布门槛另行证明
+
+审批证据：
+
+| 检查项 | 结果 |
+|---|---|
+| 原始需求逐项映射 | 16/16 通过 |
+| Settings 配置合同 | 37 项，名称唯一，均有默认值、精确作用域和 Settings 描述 |
+| 章节与 Markdown 结构 | 21/21 连续，`git diff --check` 通过 |
+| 纯文本多文档编辑保证 | 与 [VS Code `workspace.applyEdit`](https://code.visualstudio.com/api/references/vscode-api#workspace.applyEdit) 的 text-only all-or-nothing 边界一致 |
+| Settings 作用域 | 与 [VS Code Configuration Scopes](https://code.visualstudio.com/api/references/contribution-points#contributes.configuration) 一致 |
+| 未信任工作区 | 与 [Workspace Trust limited mode](https://code.visualstudio.com/api/extension-guides/workspace-trust) 一致 |
+| Patch 普通失败语义 | 与 [`git apply`](https://git-scm.com/docs/git-apply) 默认整 Patch 失败且不使用 `--reject` 的边界一致 |
+| Ref 更新语义 | 与 [`git update-ref`](https://git-scm.com/docs/git-update-ref) 的 expected old OID、事务和并发 Reader 限制一致 |
+
+批准附带四项不可降级条件：
+
+1. 实施计划必须保持第 18 节阶段边界，不能通过旁路 Git 调用提前暴露写操作。
+2. 缺少版本向量、Checkpoint、Journal 或后置校验的写操作不得进入 Preview。
+3. `package.json` Settings Schema、运行时默认值、中英文案必须由自动测试证明一致。
+4. V1 Stable 必须通过三平台、Remote、故障注入、性能和可访问性发布门槛。
 
 本规格中列出的功能边界、数据流、安全不变量、配置合同、性能预算、错误策略和测试门槛共同构成实现验收依据。实现计划不得把原子性、并发保护、恢复、Settings 文案或跨平台测试作为“后续优化”移出 V1。
