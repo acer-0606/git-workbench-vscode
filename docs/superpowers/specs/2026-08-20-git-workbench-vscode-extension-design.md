@@ -25,7 +25,7 @@ Git Workbench 是一个面向普通开发者和中小团队的本地优先 Git �
 | 总体架构 | 系统 Git CLI 为完整能力来源，`vscode.git` 为可选协作适配器 |
 | 主界面 | 渐进式双层：侧栏负责状态和导航，编辑区工作台负责复杂分析与操作 |
 | 历史改写 | 安全模式：已发布历史二次确认、恢复检查点、精确 `force-with-lease` |
-| 原子性 | 单次 Patch、纯文本 WorkspaceEdit 和 Ref 更新使用硬原子原语；多步操作提供可恢复事务 |
+| 原子性 | Index、Ref 与纯文本 WorkspaceEdit 使用最强可用原子原语；Working Tree 多文件写入和多步 Git 操作使用有前置条件的可恢复事务，不夸大跨进程保证 |
 | 并发策略 | 乐观并发控制、仓库级写队列、版本向量、执行前重验与后置校验 |
 | 性能策略 | 懒激活、流式解析、分页、虚拟化、有界并发、增量失效和大仓库降级 |
 | Settings | 每项包含配置名、默认值、作用域、意义与枚举说明，并进入 VS Code Settings 描述 |
@@ -53,6 +53,7 @@ Git Workbench 是一个面向普通开发者和中小团队的本地优先 Git �
 - 不实现云端 Patch 分享、团队同步或遥测上传。
 - 不取代 Git Hosting 服务端的分支保护和权限策略。
 - 不承诺 Rebase、Reset 等多步文件系统操作具有物理上的单次原子性；它们采用检查点和补偿恢复。
+- 不承诺对任意外部程序的 Working Tree 并发写入提供跨进程线性一致性；它们采用内容前置条件、最小写入、后置校验和不覆盖新内容的三方恢复。
 
 ## 4. 参考项目与借鉴边界
 
@@ -119,7 +120,7 @@ Git Workbench 是一个面向普通开发者和中小团队的本地优先 Git �
 
 - `direct`：比较两个端点的完整树快照。
 - `mergeBase`：比较共同祖先到目标端点的贡献。
-- `auto`：Commit 对 Commit 使用 `direct`；分支对分支使用 `mergeBase`；涉及工作区时使用指定 Ref 到工作区的 `direct`。
+- `auto`：只有 Branch 对 Branch 使用 `mergeBase`；其他组合，包括 Commit、Tag、Stash、HEAD、Index 或 Working Tree，均使用 `direct`。用户可在工具栏显式切换。
 
 比较结果显示 A/M/D/R/C/U、二进制、Submodule、LFS、文件模式和重命名相似度。用户可临时关闭重命名检测或切换空白规则。
 
@@ -144,10 +145,10 @@ WIP 快照带 `repositoryGeneration`。工作区变化后旧比较会话显示�
 2. 系统基于原始内容生成带上下文的最小 Patch。
 3. 用户确认目标和方向；按钮使用“应用到工作区”“暂存此块”等明确文案。
 4. Mutation Coordinator 重验 HEAD、Index、受影响文件内容和编辑器版本。
-5. `git apply` 或纯文本 `WorkspaceEdit` 以全成或全败方式提交。
-6. 后置状态验证通过后刷新 Diff；否则进入恢复流程。
+5. Index 目标使用受 Git Index Lock 保护的 Patch；纯文本编辑器目标优先使用单次 `WorkspaceEdit`；其他 Working Tree 目标使用 `git apply` 的完整预检和最小 Patch。
+6. 后置状态验证通过后刷新 Diff；普通 Patch 校验失败不落盘，I/O、崩溃或外部抢写导致的不确定状态进入 Reconcile/恢复流程。
 
-不得使用 `git apply --reject`，不得生成无上下文 Patch。所选行无法形成安全 Patch 时，要求选择完整 Hunk 或进入手工编辑。
+不得使用 `git apply --reject`，不得生成无上下文 Patch。所选行无法形成安全 Patch 时，要求选择完整 Hunk 或进入手工编辑。这里的“全成或全败”只描述插件控制范围内的正常失败；Working Tree 没有跨进程通用锁，不能据此覆盖执行窗口内其他程序写入的新内容。
 
 ### 6.4 空白差异交互
 
@@ -253,72 +254,74 @@ V1.x 可增加托管平台、AI、团队共享、Stacked Branch、高级 Submodu
 
 所有设置必须在 `contributes.configuration` 中提供 `type`、`default`、`scope`、范围或枚举约束、`markdownDescription` 和 `markdownEnumDescriptions`，并在 `package.nls.json` 与 `package.nls.zh-cn.json` 本地化。自动测试必须保证运行时默认值、Manifest Schema 和文案不漂移。
 
+下表的作用域使用 Manifest 精确值：`application` 仅允许 User 设置并参与 Settings Sync；`machine` 允许本机 User 或 Remote 设置且不参与同步；`window` 可在 User、Remote、Workspace 设置；`resource` 还可在 Folder 设置。安全设置虽然声明为 `resource`，运行时必须通过 `WorkspaceConfiguration.inspect()` 读取公共 API 暴露的当前 Extension Host Global（本地 User 或 Remote）、Workspace 和 Folder 原始值，再按“严格度最高”或“规则并集”计算，不能直接采用 VS Code 的普通覆盖结果。
+
 ### 8.1 通用与界面
 
 | 配置名 | 默认值 | 作用域 | Settings 描述 |
 |---|---:|---|---|
-| `gitWorkbench.git.path` | `""` | Machine / Remote | Git 可执行文件路径。空值表示优先继承 VS Code 的 `git.path`，否则使用当前运行环境中的系统 Git。工作区不能设置该值。 |
-| `gitWorkbench.repositories.autoDetect` | `"openFolders"` | Window | 仓库发现范围：`openFolders` 仅检测已打开 Folder；`subFolders` 扫描子目录；`off` 仅使用手动仓库。不会扫描整个磁盘。 |
-| `gitWorkbench.repositories.scanDepth` | `2` | Window | `subFolders` 模式的最大扫描层级，范围 1–5。数值越大，打开大型目录时扫描成本越高。 |
-| `gitWorkbench.ui.followActiveRepository` | `true` | Window | 多仓库工作区中自动跟随当前编辑文件所属仓库；关闭后固定用户选择。 |
-| `gitWorkbench.ui.compactMode` | `"auto"` | Window | `auto` 根据宽度调整；`compact` 减少行高和次要信息；`comfortable` 保留完整信息。 |
+| `gitWorkbench.git.path` | `""` | `machine` | Git 可执行文件路径。空值表示优先继承 VS Code 的 `git.path`，否则使用当前运行环境中的系统 Git。工作区不能设置该值。 |
+| `gitWorkbench.repositories.autoDetect` | `"openFolders"` | `window` | 仓库发现范围：`openFolders` 仅检测已打开 Folder；`subFolders` 扫描子目录；`off` 仅使用手动仓库。不会扫描整个磁盘。 |
+| `gitWorkbench.repositories.scanDepth` | `2` | `window` | `subFolders` 模式的最大扫描层级，范围 1–5。数值越大，打开大型目录时扫描成本越高。 |
+| `gitWorkbench.ui.followActiveRepository` | `true` | `window` | 多仓库工作区中自动跟随当前编辑文件所属仓库；关闭后固定用户选择。 |
+| `gitWorkbench.ui.compactMode` | `"auto"` | `window` | `auto` 根据宽度调整；`compact` 减少行高和次要信息；`comfortable` 保留完整信息。 |
 
 ### 8.2 日志图
 
 | 配置名 | 默认值 | 作用域 | Settings 描述 |
 |---|---:|---|---|
-| `gitWorkbench.graph.pageSize` | `200` | Resource | 每次加载的 Commit 数量，范围 50–1000；不限制历史总量。 |
-| `gitWorkbench.graph.maxLanes` | `50` | Resource | 同时绘制的最大分支轨道数；超过后折叠远轨道以限制布局成本。 |
-| `gitWorkbench.graph.order` | `"topo"` | Resource | `topo` 保持拓扑；`date` 按提交时间；`authorDate` 按作者时间。 |
-| `gitWorkbench.graph.showWorkingTree` | `true` | Resource | 在日志图顶部显示 Working Tree、Index 和未提交修改节点。 |
-| `gitWorkbench.graph.showRemoteBranches` | `true` | Resource | 显示远端跟踪分支。 |
-| `gitWorkbench.graph.showTags` | `true` | Resource | 显示 Tag。 |
-| `gitWorkbench.graph.showStashes` | `true` | Resource | 显示 Stash。 |
-| `gitWorkbench.graph.showWorktrees` | `true` | Resource | 显示关联 Worktree 及其脏状态。 |
+| `gitWorkbench.graph.pageSize` | `200` | `resource` | 每次加载的 Commit 数量，范围 50–1000；不限制历史总量。 |
+| `gitWorkbench.graph.maxLanes` | `50` | `resource` | 同时绘制的最大分支轨道数，范围 8–200；超过后折叠远轨道以限制布局成本。 |
+| `gitWorkbench.graph.order` | `"topo"` | `resource` | `topo` 保持拓扑；`date` 按提交时间；`authorDate` 按作者时间。 |
+| `gitWorkbench.graph.showWorkingTree` | `true` | `resource` | 在日志图顶部显示 Working Tree、Index 和未提交修改节点。 |
+| `gitWorkbench.graph.showRemoteBranches` | `true` | `resource` | 显示远端跟踪分支。 |
+| `gitWorkbench.graph.showTags` | `true` | `resource` | 显示 Tag。 |
+| `gitWorkbench.graph.showStashes` | `true` | `resource` | 显示 Stash。 |
+| `gitWorkbench.graph.showWorktrees` | `true` | `resource` | 显示关联 Worktree 及其脏状态。 |
 
 ### 8.3 比较与应用
 
 | 配置名 | 默认值 | 作用域 | Settings 描述 |
 |---|---:|---|---|
-| `gitWorkbench.compare.defaultMode` | `"auto"` | Resource | `auto` 对 Commit 使用 Direct、对分支使用 Merge-base、涉及工作区时使用 Direct；也可固定 `direct` 或 `mergeBase`。实际模式始终显示。 |
-| `gitWorkbench.compare.ignoreWhitespace` | `"none"` | Resource | `none` 显示全部；`eol` 忽略行尾；`all` 忽略全部空白。只影响查看，不改变实际 Patch。工作台可会话级快捷覆盖。 |
-| `gitWorkbench.compare.renameDetection` | `"auto"` | Resource | `auto` 在性能预算内检测；`on` 始终尝试；`off` 关闭。降级时明确显示新增/删除。 |
-| `gitWorkbench.compare.maxFileSizeMB` | `10` | Machine / Remote | 可生成完整文本 Diff 的单文件大小上限；超过后只显示元数据与统计。 |
-| `gitWorkbench.compare.maxDiffLines` | `20000` | Machine / Remote | 单个 Diff 首次渲染的最大行数；超过后按块加载并关闭非必要装饰。 |
-| `gitWorkbench.apply.defaultTarget` | `"prompt"` | Resource | `prompt` 每次询问；`worktree` 写当前工作区；`index` 只写暂存区；`newWorktree` 在新 Worktree 应用。 |
+| `gitWorkbench.compare.defaultMode` | `"auto"` | `resource` | `auto` 仅对 Branch 对 Branch 使用 Merge-base，其他端点组合使用 Direct；也可固定 `direct` 或 `mergeBase`。实际模式始终显示。 |
+| `gitWorkbench.compare.ignoreWhitespace` | `"none"` | `resource` | `none` 显示全部；`eol` 忽略行尾；`all` 忽略全部空白。只影响查看，不改变实际 Patch。工作台可会话级快捷覆盖。 |
+| `gitWorkbench.compare.renameDetection` | `"auto"` | `resource` | `auto` 在性能预算内检测；`on` 始终尝试；`off` 关闭。降级时明确显示新增/删除。 |
+| `gitWorkbench.compare.maxFileSizeMB` | `10` | `machine` | 可生成完整文本 Diff 的单文件大小上限，范围 1–1024 MB；超过后只显示元数据与统计。 |
+| `gitWorkbench.compare.maxDiffLines` | `20000` | `machine` | 单个 Diff 首次渲染的最大行数，范围 1000–200000；超过后按块加载并关闭非必要装饰。 |
+| `gitWorkbench.apply.defaultTarget` | `"prompt"` | `resource` | `prompt` 每次询问；`worktree` 写当前工作区；`index` 只写暂存区；`newWorktree` 在新 Worktree 应用。 |
 
 ### 8.4 工作流
 
 | 配置名 | 默认值 | 作用域 | Settings 描述 |
 |---|---:|---|---|
-| `gitWorkbench.commit.smartCommit` | `false` | Resource | 暂存区为空时是否自动 Stage 全部已跟踪修改。默认关闭，防止未审阅内容进入 Commit。 |
-| `gitWorkbench.pull.strategy` | `"inherit"` | Resource | `inherit` 使用 Git 配置，未配置则询问；可选 `prompt`、`ffOnly`、`merge`、`rebase`。 |
-| `gitWorkbench.fetch.prune` | `"inherit"` | Resource | `inherit` 使用 Git 配置；`on` 清理失效远端跟踪 Ref；`off` 禁用。不会删除本地分支。 |
-| `gitWorkbench.remote.autoFetch` | `false` | Resource | 是否后台 Fetch。只更新远端跟踪 Ref，不自动 Pull、Merge 或改工作区。 |
-| `gitWorkbench.remote.autoFetchIntervalMinutes` | `10` | Resource | 自动 Fetch 间隔，最小 5 分钟；失焦、休眠或写操作时暂停。 |
-| `gitWorkbench.branch.dirtyWorktreeStrategy` | `"prompt"` | Resource | `prompt` 询问；`keep` 保留修改；`stash` 创建具名储藏；`newWorktree` 创建新 Worktree。 |
-| `gitWorkbench.stash.includeUntracked` | `false` | Resource | 创建 Stash 时默认是否包含 Untracked；执行前仍显示实际范围。 |
-| `gitWorkbench.conflict.autoOpen` | `"prompt"` | Resource | `prompt` 询问；`first` 自动打开首个文本冲突；`never` 只显示横幅和列表。 |
+| `gitWorkbench.commit.smartCommit` | `false` | `resource` | 暂存区为空时是否自动 Stage 全部已跟踪修改。默认关闭，防止未审阅内容进入 Commit。 |
+| `gitWorkbench.pull.strategy` | `"inherit"` | `resource` | `inherit` 使用 Git 配置，未配置则询问；可选 `prompt`、`ffOnly`、`merge`、`rebase`。 |
+| `gitWorkbench.fetch.prune` | `"inherit"` | `resource` | `inherit` 使用 Git 配置；`on` 清理失效远端跟踪 Ref；`off` 禁用。不会删除本地分支。 |
+| `gitWorkbench.remote.autoFetch` | `false` | `resource` | 是否后台 Fetch。只更新远端跟踪 Ref，不自动 Pull、Merge 或改工作区。 |
+| `gitWorkbench.remote.autoFetchIntervalMinutes` | `10` | `resource` | 自动 Fetch 间隔，范围 5–1440 分钟；失焦、休眠或写操作时暂停。 |
+| `gitWorkbench.branch.dirtyWorktreeStrategy` | `"prompt"` | `resource` | `prompt` 询问；`keep` 保留修改；`stash` 创建具名储藏；`newWorktree` 创建新 Worktree。 |
+| `gitWorkbench.stash.includeUntracked` | `false` | `resource` | 创建 Stash 时默认是否包含 Untracked；执行前仍显示实际范围。 |
+| `gitWorkbench.conflict.autoOpen` | `"prompt"` | `resource` | `prompt` 询问；`first` 自动打开首个文本冲突；`never` 只显示横幅和列表。 |
 
 ### 8.5 安全与恢复
 
 | 配置名 | 默认值 | 作用域 | Settings 描述 |
 |---|---:|---|---|
-| `gitWorkbench.safety.mode` | `"balanced"` | User + Resource | `balanced` 保持普通操作短路径，危险操作预览和检查点；`strict` 增加确认并禁止改写已发布历史。各作用域取更严格值。 |
-| `gitWorkbench.safety.protectedBranches` | `["main","master","release/*"]` | User + Resource | 受保护分支 Glob。正常 Commit/快进 Push 可用；删除、Reset、Rebase、历史改写和强推加强校验。各作用域取并集。 |
-| `gitWorkbench.safety.publishedRewrite` | `"confirm"` | User + Resource | `deny` 禁止已发布历史改写；`confirm` 展示影响、二次确认并只允许精确 Lease。无“始终允许”。 |
-| `gitWorkbench.safety.checkpointRetentionDays` | `30` | Machine / Remote | 恢复检查点保留天数，范围 1–365；只清理插件内部恢复数据。 |
-| `gitWorkbench.safety.checkpointMaxCount` | `50` | Machine / Remote | 每仓库恢复检查点上限；超过后清理最旧且未固定的检查点。 |
+| `gitWorkbench.safety.mode` | `"balanced"` | `resource` | `balanced` 保持普通操作短路径，危险操作预览和检查点；`strict` 增加确认并禁止改写已发布历史。运行时读取 Global、Workspace、Folder 各层并取更严格值。 |
+| `gitWorkbench.safety.protectedBranches` | `["main","master","release/*"]` | `resource` | 受保护分支 Glob。正常 Commit/快进 Push 可用；删除、Reset、Rebase、历史改写和强推加强校验。运行时合并各层规则并取并集。 |
+| `gitWorkbench.safety.publishedRewrite` | `"confirm"` | `resource` | `deny` 禁止已发布历史改写；`confirm` 展示影响、二次确认并只允许精确 Lease。运行时读取各层并取更严格值，无“始终允许”。 |
+| `gitWorkbench.safety.checkpointRetentionDays` | `30` | `machine` | 恢复检查点保留天数，范围 1–365；只清理当前本机或 Remote 环境中的插件内部恢复数据。 |
+| `gitWorkbench.safety.checkpointMaxCount` | `50` | `machine` | 每仓库恢复检查点上限，范围 5–500；超过后清理最旧且未固定的检查点。 |
 
 ### 8.6 性能与诊断
 
 | 配置名 | 默认值 | 作用域 | Settings 描述 |
 |---|---:|---|---|
-| `gitWorkbench.performance.profile` | `"auto"` | Machine / Remote | `auto` 根据仓库规模和 Git 延迟调整；`balanced` 保留更多信息；`largeRepository` 优先性能。 |
-| `gitWorkbench.performance.maxCacheMB` | `150` | Machine / Remote | 插件全局内存缓存上限；超过后 LRU 清理非活动仓库、旧 Diff 和日志页。 |
-| `gitWorkbench.performance.maxConcurrentReads` | `4` | Machine / Remote | 全局只读 Git 进程上限，范围 1–8；每仓库最多两个读任务，写操作始终串行。 |
-| `gitWorkbench.logging.level` | `"error"` | User | 本地日志级别：`off/error/warn/info/debug/trace`。Trace 也不得记录文件内容、Diff、令牌或凭据。 |
-| `gitWorkbench.diagnostics.redactPaths` | `true` | User | 导出诊断时隐藏用户名、绝对路径、URL 凭据和可识别项目的信息。 |
+| `gitWorkbench.performance.profile` | `"auto"` | `machine` | `auto` 根据仓库规模和 Git 延迟调整；`balanced` 保留更多信息；`largeRepository` 优先性能。 |
+| `gitWorkbench.performance.maxCacheMB` | `150` | `machine` | 插件全局内存缓存上限，范围 50–2048 MB；超过后 LRU 清理非活动仓库、旧 Diff 和日志页。 |
+| `gitWorkbench.performance.maxConcurrentReads` | `4` | `machine` | 全局只读 Git 进程上限，范围 1–8；每仓库最多两个读任务，写操作始终串行。 |
+| `gitWorkbench.logging.level` | `"error"` | `application` | 本地日志级别：`off/error/warn/info/debug/trace`。Trace 也不得记录文件内容、Diff、令牌或凭据。 |
+| `gitWorkbench.diagnostics.redactPaths` | `true` | `application` | 导出诊断时隐藏用户名、绝对路径、仓库名和可识别项目信息。关闭后仅保留本地导出所需的路径上下文；凭据、Token 和 URL 密码仍始终删除。 |
 
 ### 8.7 不可配置的安全不变量
 
@@ -329,6 +332,7 @@ V1.x 可增加托管平台、AI、团队共享、Stacked Branch、高级 Submodu
 - 不静默跳过 Hooks。
 - 不用旧全文件快照覆盖更新内容。
 - 不在未信任工作区执行写操作或网络操作。
+- Settings 不能关闭凭据脱敏、版本向量校验、Checkpoint 前置条件或受保护分支的最低安全线。
 
 ## 9. 总体技术架构
 
@@ -414,7 +418,7 @@ Query 被取消不改变仓库。未知解析字段被忽略并记录兼容性�
 5. 重验版本向量、Git Lock 和 PausedOperation。
 6. 写入 Checkpoint 和 Durable Journal。
 7. 执行最小 Git 原语；冲突时进入 Paused 状态。
-8. 验证后置状态；成功 Commit Journal，失败 Rollback 或 Needs Attention。
+8. 验证后置状态；成功 Commit Journal。只有当前状态仍等于本操作写入的 After Image 时才允许补偿 Rollback，否则进入 Needs Attention，避免恢复动作覆盖外部新修改。
 9. 增加 `repositoryGeneration`，精确失效缓存并向 UI 发送增量。
 
 ## 11. 原子性与并发安全
@@ -442,12 +446,15 @@ Query 被取消不改变仓库。未知解析字段被忽略并记录兼容性�
 
 ### 11.3 保证等级
 
+保证分为 Git/VS Code 原语的原子提交、普通失败下的逻辑全成或全败，以及带 Checkpoint 的可恢复事务。操作系统没有跨 macOS、Windows、Linux 和 Remote 文件系统通用的 Working Tree 事务锁，因此不宣称与任意外部 Writer 跨进程线性一致。
+
 | 操作 | 保证 |
 |---|---|
-| 单/多 Hunk Patch | `git apply` 默认全成或全败；不使用 `--reject` |
-| 纯文本多文档编辑 | VS Code WorkspaceEdit 全成或全败；仅使用最小 TextEdit |
+| Hunk/行应用到 Index | `git apply --cached` 使用 Index Lock；普通校验失败全不应用，不使用 `--reject` |
+| Hunk/行应用到 Working Tree | `git apply` 先完整校验且不使用 `--reject`；文本编辑器优先单次 WorkspaceEdit。I/O、崩溃或外部并发窗口由 Checkpoint、后置校验和 Reconcile 覆盖 |
+| 纯文本多文档编辑 | VS Code WorkspaceEdit 在 API 控制范围内全成或全败；仅使用最小 TextEdit，调用前无异步间隙地复验文档版本 |
 | Stage/Unstage | Git Index Lock + 基线校验 |
-| 单/多 Ref 更新 | `update-ref` expected old OID；多 Ref 使用 `--stdin` 事务 |
+| 单/多 Ref 更新 | `update-ref` expected old OID；多 Ref 使用 `--stdin` 事务。事务保证更新集合一起成功或失败，但并发外部 Reader 仍可能短暂看到其中一部分，因此不宣称跨进程线性一致性 |
 | Reset/Rebase/历史改写 | Checkpoint + Durable Journal + PausedOperation + 补偿恢复 |
 | Push | 服务端快进规则或显式 expected OID Lease；未知结果先对账 |
 
@@ -458,6 +465,7 @@ Query 被取消不改变仓库。未知解析字段被忽略并记录兼容性�
 - 发现内容 Hash 或文档版本不一致，禁用旧确认按钮。
 - 用户可“刷新并重新预览”“在新内容上重新套用”“导出 Patch”，不存在“仍然覆盖”。
 - 执行中发生外部变化且后置校验失败时，状态为 Needs Attention，不宣称成功、不自动重试。
+- 恢复仅在当前内容仍匹配本操作 After Image 时自动回滚；否则提供 Base/Ours/External 三方恢复，不用旧快照覆盖外部新内容。
 
 ## 12. Checkpoint、Journal 与恢复
 
@@ -466,7 +474,7 @@ Query 被取消不改变仓库。未知解析字段被忽略并记录兼容性�
 - Ref 状态使用 `refs/git-workbench/recovery/<operation-id>/<label>`，通过 expected old OID 安全创建。
 - 受影响的 Dirty/Untracked 文件使用二进制安全、内容寻址的本地恢复快照。
 - Journal、快照和索引保存在 Extension `globalStorageUri` 的仓库哈希目录；Remote 场景存于远端 Extension Host。
-- 恢复数据不参与 Settings Sync、不上传网络；本地权限限制为当前用户。
+- 恢复数据不参与 Settings Sync、不上传网络；POSIX 环境使用仅当前用户可读写权限，Windows 使用当前用户 ACL。恢复快照包含源码且不承诺额外的应用层加密，UI 必须公开存储位置、保留策略和立即清理入口。
 - 清理由保留天数和每仓库数量共同控制；固定的检查点不自动清理。
 
 ### 12.2 Journal 状态
@@ -571,7 +579,7 @@ Manifest 声明 `untrustedWorkspaces.supported: "limited"`。未信任工作区�
 ## 16. 跨平台与兼容性
 
 - VS Code 基线：`>= 1.96.0`；测试最低版、Stable 和 Insiders。
-- Git 基线：`>= 2.35.3` 或带等效安全补丁的发行版。
+- Git 正式支持基线：`>= 2.35.3`。更旧或仅由发行版回移安全补丁的构建可以进入能力探测后的兼容只读模式，但不属于 V1 写操作支持矩阵。
 - 启动时探测具体 Git Capability，不以版本字符串猜测功能。
 - macOS：Apple Silicon、Intel，大小写敏感/不敏感文件系统。
 - Windows：Windows 10/11、Git for Windows、长路径、盘符、UNC、CRLF。
@@ -596,7 +604,22 @@ Manifest 声明 `untrustedWorkspaces.supported: "limited"`。未信任工作区�
 
 特殊测试必须覆盖中文、Emoji、空格、Tab、换行文件名，仅大小写重命名、Symlink、Executable Bit、CRLF/LF、Binary、LFS、Submodule、Hook 修改工作区、Signing、恶意 Ref/Message/Path 和 Webview XSS。
 
-## 18. 发布门槛
+## 18. V1 实施分解
+
+V1 是完整产品目标，但不能作为一个不可分割的大改动实现。实施计划必须按以下边界递进；每个阶段都建立在前一阶段已验证的接口上，不能为赶进度创建旁路 Git 调用。
+
+| 阶段 | 交付边界 | 进入下一阶段的条件 |
+|---|---|---|
+| 0. Foundation | Monorepo、Domain/Protocol/Config Schema、CLI Runner、Capability Probe、Repository Registry、测试夹具和 CI | 三平台可发现仓库并稳定解析只读状态；设置 Schema 与运行时默认值一致 |
+| 1. Read Model | Native Views、日志分页、DAG、Refs、WIP、任意端点只读比较、Whitespace 会话控件 | 大仓库首屏/滚动预算达标；Webview IPC、取消和缓存失效通过测试 |
+| 2. Daily Mutations | Stage/Unstage、Commit/Amend、Branch、Stash、Fetch/Pull/Push 和系统凭据交互 | 仓库级写队列、版本向量、Hook/Lock/网络错误用例通过 |
+| 3. Patch Transactions | Hunk/行应用、Working Tree/Index/New Worktree 目标、Checkpoint、Journal、Recovery Center | 原子 Patch、并发过期、崩溃恢复和故障注入门槛通过 |
+| 4. Paused Operations | Merge/Rebase/Cherry-pick/Revert/Pull/Stash 冲突、Continue/Skip/Abort、特殊冲突类型 | 所有 PausedOperation 状态可恢复，原生 Merge Editor 集成通过三平台 E2E |
+| 5. History & GA Hardening | Reword、Interactive Rebase、Reset、安全 Lease、完整诊断、可访问性、本地化、供应链和性能收尾 | 本规格第 19 节全部发布门槛通过 |
+
+阶段 0–4 可发布内部 Preview，但不得将缺少恢复保护的写操作暴露为“实验功能”。阶段 5 完成后才形成 V1 Stable。
+
+## 19. 发布门槛
 
 1. 所有 V1 核心流程有端到端用例。
 2. 支持矩阵通过真实 Git 集成测试。
@@ -608,7 +631,7 @@ Manifest 声明 `untrustedWorkspaces.supported: "limited"`。未信任工作区�
 8. VSIX 通过 SBOM、依赖审计和内容检查。
 9. Preview 通道通过后才进入 Stable；配置、Journal 与 Recovery 数据迁移向后兼容。
 
-## 19. 用户需求映射
+## 20. 用户需求映射
 
 | 原始需求 | 设计落点 |
 |---|---|
@@ -629,6 +652,6 @@ Manifest 声明 `untrustedWorkspaces.supported: "limited"`。未信任工作区�
 | 失败鲁棒性 | Typed Errors、Journal、Reconcile、故障注入、禁止盲重试 |
 | VS Code Settings | 完整配置合同与工作台会话级快捷覆盖 |
 
-## 20. 设计完成判定
+## 21. 设计完成判定
 
 本规格中列出的功能边界、数据流、安全不变量、配置合同、性能预算、错误策略和测试门槛共同构成实现验收依据。实现计划不得把原子性、并发保护、恢复、Settings 文案或跨平台测试作为“后续优化”移出 V1。
