@@ -84,17 +84,19 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     context.subscriptions.push(workspaceTrustSubscription);
   };
 
-  context.subscriptions.push(vscode.commands.registerCommand('gitWorkbench.open', async () => {
+  const runDiscoveryAndRefresh = async (): Promise<void> => {
     const current = getServices();
     ensureWorkspaceFolderSubscription();
     ensureWorkspaceTrustSubscription();
     await current.scheduler.runNow(workspaceFolders());
     current.output.appendLine(`Git Workbench ready (${current.registry.list().length} repositories)`);
-    current.output.show(true);
-    // Discovery finished after the views first rendered empty: push the
-    // fresh registry into both trees now.
     repositoriesView.refresh();
     await refsView.refresh();
+  };
+
+  context.subscriptions.push(vscode.commands.registerCommand('gitWorkbench.open', async () => {
+    await runDiscoveryAndRefresh();
+    services?.output.show(true);
   }));
 
   // Views stay inert until VS Code makes them visible; the read service only
@@ -154,11 +156,25 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     const snapshot = await service.refs(first.id, 1, `refs-${Date.now()}`) as { branches: { name: string; isHead: boolean }[]; tags: { name: string }[]; stashes: { subject: string }[]; worktrees: { path: string }[] };
     return { branches: snapshot.branches, tags: snapshot.tags, stashes: snapshot.stashes, worktrees: snapshot.worktrees };
   });
+  const repositoriesTreeView = vscode.window.createTreeView('gitWorkbench.repositories', { treeDataProvider: repositoriesView });
+  const refsTreeView = vscode.window.createTreeView('gitWorkbench.refs', { treeDataProvider: refsView });
+  let discoveryStarted = false;
+  const discoverOnceVisible = (): void => {
+    if (discoveryStarted) return;
+    if (!repositoriesTreeView.visible && !refsTreeView.visible) return;
+    discoveryStarted = true;
+    void runDiscoveryAndRefresh().catch((error: unknown) => {
+      services?.output.appendLine(`Discovery failed: ${String(error)}`);
+    });
+  };
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('gitWorkbench.repositories', repositoriesView),
-    vscode.window.registerTreeDataProvider('gitWorkbench.refs', refsView),
+    repositoriesTreeView,
+    refsTreeView,
+    repositoriesTreeView.onDidChangeVisibility(discoverOnceVisible),
+    refsTreeView.onDidChangeVisibility(discoverOnceVisible),
     registerVirtualDocuments(context, 'git'),
   );
+  discoverOnceVisible();
 
   // Conflicts surface: a fixed tree of conflicted paths plus the optional
   // merge-editor integration. Binary/delete-modify/submodule kinds are

@@ -32,7 +32,11 @@ describe('workspace manifest', () => {
 
     expect(manifest.engines.vscode).toBe('^1.96.0');
     expect(manifest.extensionKind).toEqual(['workspace']);
-    expect(manifest.activationEvents).toEqual([]);
+    // Lazy activation only: views becoming visible or the explicit open
+    // command; never '*' or onStartupFinished.
+    expect(manifest.activationEvents).toEqual(['onView:gitWorkbench.repositories', 'onView:gitWorkbench.refs', 'onCommand:gitWorkbench.open']);
+    expect(manifest.activationEvents).not.toContain('*');
+    expect(manifest.activationEvents.some((event: unknown) => String(event).startsWith('onStartupFinished'))).toBe(false);
     expect(manifest.main).toBe('./dist/extension.cjs');
     expect(manifest.devDependencies['@types/vscode']).toBe('1.96.0');
     expect(manifest.devDependencies['@types/node']).toBe('20.19.43');

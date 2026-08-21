@@ -12,7 +12,11 @@
   "extensionKind": [
     "workspace"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:gitWorkbench.repositories",
+    "onView:gitWorkbench.refs",
+    "onCommand:gitWorkbench.open"
+  ],
   "main": "./dist/extension.cjs",
   "workspaces": [
     "packages/*",
