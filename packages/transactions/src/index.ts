@@ -6,3 +6,4 @@ export * from './coordinator.js';
 export * from './contentStore.js';
 export * from './checkpoint.js';
 export * from './safePath.js';
+export * from './pausedCoordinator.js';

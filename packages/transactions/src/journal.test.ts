@@ -28,6 +28,8 @@ describe('journal state machine', () => {
     expect(canTransition('Verifying', 'RollingBack')).toBe(true);
     expect(canTransition('RollingBack', 'RolledBack')).toBe(true);
     expect(canTransition('Running', 'Paused')).toBe(true);
+    expect(canTransition('Paused', 'Committed')).toBe(true);
+    expect(canTransition('Paused', 'Paused')).toBe(true);
   });
 
   it('rejects backwards moves and moves out of terminal states', () => {

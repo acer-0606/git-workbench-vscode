@@ -32,7 +32,9 @@ const legalEdges: Readonly<Record<JournalState, readonly JournalState[]>> = {
   Cancelled: [],
   Checkpointed: ['Running', 'Cancelled'],
   Running: ['Paused', 'Verifying'],
-  Paused: [],
+  // A paused operation waits for the user: Continue advances it, a step
+  // move re-enters Paused, verification can still need attention.
+  Paused: ['Paused', 'Verifying', 'Committed', 'NeedsAttention'],
   // Verifying may re-enter itself: the coordinator records the failure
   // reason as a second Verifying entry before classifying the outcome.
   Verifying: ['Verifying', 'Committed', 'RollingBack', 'NeedsAttention'],
