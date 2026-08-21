@@ -1,4 +1,4 @@
-import { chmod, mkdir, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, realpath, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createRepositoryFixture } from '@git-workbench/testkit';
@@ -29,8 +29,11 @@ describe('bounded repository discovery', () => {
 
       expect(result.partial).toBe(false);
       expect(result.repositories).toHaveLength(2);
+      // mkdtemp may hand back a Windows 8.3 short name while Git reports the
+      // long form; compare canonicalized real paths instead of raw strings.
       const normalize = (value: string): string => decodeURIComponent(value).replace(/\\/g, '/').toLowerCase();
-      expect(result.repositories.some((repository) => normalize(repository.worktreeUri).includes(normalize(markerParent)))).toBe(true);
+      const markerParentReal = await realpath(markerParent);
+      expect(result.repositories.some((repository) => normalize(repository.worktreeUri).includes(normalize(markerParentReal)))).toBe(true);
     } finally {
       await nested.dispose();
       await fixture.dispose();
@@ -180,7 +183,7 @@ describe('bounded repository discovery', () => {
         ? [{ name: 'bad', ...directory }, { name: 'good', ...directory }]
         : path.replace(/\\/g, '/') === '/root/good' ? [marker] : [],
     };
-    const result = await discoverRepositories(['/root'], async (path) => path === '/root/good' ? descriptor : undefined, {
+    const result = await discoverRepositories(['/root'], async (path) => path.replace(/\\/g, '/').endsWith('/root/good') ? descriptor : undefined, {
       mode: 'subFolders', scanDepth: 1, fileSystem,
     });
     expect(result.partial).toBe(true);
