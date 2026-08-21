@@ -40,3 +40,21 @@ jobs:
           name: git-workbench-vsix-${{ matrix.os }}
           path: '*.vsix'
           if-no-files-found: error
+
+  performance:
+    name: nightly read-model budget
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node --experimental-strip-types tests/fixtures/build-nightly-fixture.mjs
+      - run: npm run test:performance
+        env:
+          GIT_WORKBENCH_PERF_REPO: /tmp/git-workbench-perf-100k

@@ -12,6 +12,7 @@ const vscodeState = vi.hoisted(() => {
     commands,
     configurationCalls,
     trustListener: undefined as (() => void) | undefined,
+    registerDocumentProvider: () => ({ dispose: () => undefined }),
     workspace: {
       isTrusted: true,
       workspaceFolders: [] as Array<{ uri: { fsPath: string } }> | undefined,
@@ -29,11 +30,29 @@ const vscodeState = vi.hoisted(() => {
   return state;
 });
 
-vi.mock('vscode', () => ({
-  workspace: vscodeState.workspace,
-  commands: { registerCommand: (id: string, callback: () => Promise<void>) => { vscodeState.commands.set(id, callback); return { dispose: () => undefined }; } },
-  window: { createOutputChannel: () => ({ appendLine: () => undefined, show: () => undefined, dispose: () => undefined }) },
-}));
+vi.mock('vscode', () => {
+  // Attach members on the shared state object itself: spreading would
+  // snapshot mutable fields like workspaceFolders and isTrusted.
+  ;(vscodeState.workspace as { registerTextDocumentContentProvider?: unknown }).registerTextDocumentContentProvider = vscodeState.registerDocumentProvider;
+  return {
+    workspace: vscodeState.workspace,
+    commands: { registerCommand: (id: string, callback: () => Promise<void>) => { vscodeState.commands.set(id, callback); return { dispose: () => undefined }; } },
+    window: {
+      createOutputChannel: () => ({ appendLine: () => undefined, show: () => undefined, dispose: () => undefined }),
+      registerTreeDataProvider: () => ({ dispose: () => undefined }),
+    },
+    EventEmitter: class {
+      event(): void { /* lazy trees never fire in these tests */ }
+      fire(): void { /* not asserted here */ }
+      dispose(): void { /* no-op */ }
+    },
+    TreeItem: class {
+      constructor(public label: string, public collapsibleState?: number) {}
+    },
+    TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
+    Uri: { file: (path: string) => ({ fsPath: path }) },
+  };
+});
 
 describe('repository locator and registry', () => {
   it('uses canonical paths and gives linked worktrees distinct IDs in one common group', async () => {

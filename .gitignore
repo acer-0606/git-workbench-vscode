@@ -9,3 +9,7 @@ dist-types/
 *.tsbuildinfo
 *.vsix
 .vscode-test/
+dist-webview/
+src/extension/*.js
+src/extension/*.d.ts
+src/extension/*.js.map

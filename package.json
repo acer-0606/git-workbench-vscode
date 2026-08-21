@@ -29,7 +29,8 @@
     "test:vscode": "npm run build:vscode-tests && node tests/vscode/out/run.js",
     "sync:settings": "node scripts/sync-settings.mjs",
     "check:vsix": "node scripts/check-vsix.mjs",
-    "package": "npm run sync:settings && npm run check && npm run build && vsce package --no-dependencies"
+    "package": "npm run sync:settings && npm run check && npm run build && vsce package --no-dependencies",
+    "test:performance": "vitest run tests/performance"
   },
   "dependencies": {
     "ajv": "^8.20.0"
