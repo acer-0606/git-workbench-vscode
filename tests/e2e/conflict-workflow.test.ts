@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 import { createRepositoryFixture, type RepositoryFixture } from '@git-workbench/testkit';
@@ -86,7 +87,7 @@ describe('paused operation restart E2E', () => {
 
       // "Restart": a fresh node process samples the same repository. The
       // state is reconstructed from disk, so the two samples must match.
-      const samplerPath = new URL('./restart-sampler.mjs', import.meta.url).pathname;
+      const samplerPath = fileURLToPath(new URL('./restart-sampler.mjs', import.meta.url));
       const { execFile: childExec } = await import('node:child_process');
       const { promisify: childPromisify } = await import('node:util');
       const runSampler = childPromisify(childExec);
