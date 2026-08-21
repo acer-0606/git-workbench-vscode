@@ -3,3 +3,6 @@ export * from './journal.js';
 export * from './repositoryLease.js';
 export * from './refCheckpoint.js';
 export * from './coordinator.js';
+export * from './contentStore.js';
+export * from './checkpoint.js';
+export * from './safePath.js';
