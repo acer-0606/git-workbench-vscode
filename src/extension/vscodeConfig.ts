@@ -50,13 +50,19 @@ export function createVscodeConfigSnapshot(
   // An empty section plus a folder URI is the only form where inspect() can
   // faithfully expose Global, Workspace and WorkspaceFolder values together.
   const configuration = workspace.getConfiguration('', resource);
-  const configuredPath = configuredGitPath(configuration.get<unknown>('gitWorkbench.git.path', ''))
-    ?? configuredGitPath(configuration.get<unknown>('git.path', ''))
-    ?? 'git';
+  // An untrusted workspace must never choose the Git executable: `git.path`
+  // is not machine-scoped, so its workspace value survives VS Code's own
+  // restricted-configuration blanking. Only user-configured paths count.
+  const configuredPath = trusted
+    ? configuredGitPath(configuration.get<unknown>('gitWorkbench.git.path', ''))
+      ?? configuredGitPath(configuration.get<unknown>('git.path', ''))
+    : configuredGitPath(configuration.inspect?.<unknown>('gitWorkbench.git.path')?.globalValue)
+      ?? configuredGitPath(configuration.inspect?.<unknown>('git.path')?.globalValue);
+  const gitPath = configuredPath ?? 'git';
   const autoDetect = configuration.get<unknown>('gitWorkbench.repositories.autoDetect', 'openFolders');
   const scanDepth = configuration.get<unknown>('gitWorkbench.repositories.scanDepth', 2);
   return Object.freeze({
-    gitPath: configuredPath,
+    gitPath,
     autoDetect: autoDetect === 'openFolders' || autoDetect === 'subFolders' || autoDetect === 'off' ? autoDetect : 'openFolders',
     scanDepth: typeof scanDepth === 'number' && Number.isInteger(scanDepth) && scanDepth >= 1 && scanDepth <= 5 ? scanDepth : 2,
     safety: readEffectiveSafetySettings(configuration, trusted),
