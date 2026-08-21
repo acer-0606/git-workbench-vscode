@@ -491,6 +491,27 @@
           "markdownDescription": "%config.gitWorkbench.diagnostics.redactPaths%"
         }
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitWorkbench",
+          "title": "Git Workbench",
+          "icon": "media/workbench.svg"
+        }
+      ]
+    },
+    "views": {
+      "gitWorkbench": [
+        {
+          "id": "gitWorkbench.repositories",
+          "name": "Repositories"
+        },
+        {
+          "id": "gitWorkbench.refs",
+          "name": "Refs"
+        }
+      ]
     }
   },
   "capabilities": {

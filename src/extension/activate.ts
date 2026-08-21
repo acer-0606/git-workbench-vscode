@@ -1,9 +1,14 @@
 import * as vscode from 'vscode';
-import { GitProcessRunner, locateRepository } from '@git-workbench/git-cli';
+import { GitProcessRunner, locateRepository, parseStatusV2, readLogPage, readRefs, readWorktrees } from '@git-workbench/git-cli';
 
 import { discoverRepositories, WorkspaceFolderDiscoveryScheduler } from './repositoryDiscovery.js';
 import { RepositoryRegistry } from './repositoryRegistry.js';
 import { createVscodeConfigSnapshot } from './vscodeConfig.js';
+import { GenerationCache } from './query/generationCache.js';
+import { QueryScheduler } from './query/queryScheduler.js';
+import { ReadModelService } from './query/readModelService.js';
+import { RepositoriesTreeDataProvider } from './views/repositoriesView.js';
+import { RefsTreeDataProvider } from './views/refsView.js';
 
 interface LazyServices {
   readonly registry: RepositoryRegistry;
@@ -83,4 +88,66 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     current.output.appendLine(`Git Workbench ready (${current.registry.list().length} repositories)`);
     current.output.show(true);
   }));
+
+  // Views stay inert until VS Code makes them visible; the read service only
+  // reaches Git when a view or the workbench actually asks for data.
+  const readModel = (): ReadModelService => {
+    if (readModelService !== undefined) return readModelService;
+    const registry = services?.registry ?? getServices().registry;
+    readModelService = new ReadModelService(
+      registry,
+      new QueryScheduler({ globalLimit: 4, repositoryLimit: 2 }),
+      new GenerationCache(64 * 1024 * 1024),
+      {
+        status: async (repositoryId, generation, signal) => {
+          const descriptor = registry.list().find((entry) => entry.id === repositoryId);
+          if (!descriptor) throw new Error('repository not registered');
+          const runner = new GitProcessRunner('git');
+          const result = await runner.run({ args: ['status', '--porcelain=v2', '-z', '--branch'], cwd: descriptor.worktreeUri, kind: 'query', maxStdoutBytes: 16 * 1024 * 1024, maxStderrBytes: 64 * 1024, signal });
+          if (result.exitCode !== 0) throw new Error(`git status failed: ${result.stderrText()}`);
+          return parseStatusV2(result.stdout, generation);
+        },
+        refs: async (repositoryId, generation, signal) => {
+          const descriptor = registry.list().find((entry) => entry.id === repositoryId);
+          if (!descriptor) throw new Error('repository not registered');
+          const runner = new GitProcessRunner('git');
+          const [refs, worktrees] = await Promise.all([
+            readRefs(runner, descriptor.worktreeUri),
+            readWorktrees(runner, descriptor.worktreeUri),
+          ]);
+          void signal;
+          void generation;
+          return {
+            branches: refs.filter((ref) => ref.kind === 'branch').map((ref) => ({ name: ref.displayName, isHead: ref.isHead === true })),
+            tags: refs.filter((ref) => ref.kind === 'tag').map((ref) => ({ name: ref.displayName })),
+            stashes: [],
+            worktrees: worktrees.map((worktree) => ({ path: worktree.path })),
+          };
+        },
+        logPage: async (repositoryId, generation, input, signal) => {
+          const descriptor = registry.list().find((entry) => entry.id === repositoryId);
+          if (!descriptor) throw new Error('repository not registered');
+          const request = input as { readonly order: 'topo' | 'date' | 'authorDate'; readonly limit: number; readonly cursor?: string };
+          const runner = new GitProcessRunner('git');
+          void signal;
+          return readLogPage(runner, descriptor.worktreeUri, generation, request.order, request.limit, request.cursor);
+        },
+      },
+    );
+    return readModelService;
+  };
+  let readModelService: ReadModelService | undefined;
+
+  const repositoriesView = new RepositoriesTreeDataProvider(() => readModel().repositories());
+  const refsView = new RefsTreeDataProvider(async () => {
+    const service = readModel();
+    const first = service.repositories()[0];
+    if (!first) return { branches: [], tags: [], stashes: [], worktrees: [] };
+    const snapshot = await service.refs(first.id, 1, `refs-${Date.now()}`) as { branches: { name: string; isHead: boolean }[]; tags: { name: string }[]; stashes: { subject: string }[]; worktrees: { path: string }[] };
+    return { branches: snapshot.branches, tags: snapshot.tags, stashes: snapshot.stashes, worktrees: snapshot.worktrees };
+  });
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('gitWorkbench.repositories', repositoriesView),
+    vscode.window.registerTreeDataProvider('gitWorkbench.refs', refsView),
+  );
 }

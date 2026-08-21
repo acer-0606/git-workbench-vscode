@@ -85,6 +85,16 @@ describe('QueryScheduler concurrency', () => {
     expect(work).toHaveBeenCalledTimes(1);
   });
 
+  it('starts a fresh run for the same key issued in the first run\'s continuation', async () => {
+    const scheduler = new QueryScheduler({ globalLimit: 4, repositoryLimit: 2 });
+    const work = vi.fn(async (_signal: AbortSignal, attempt: number) => attempt);
+    const first = await scheduler.run('repo', 'same-key', 'request-1', () => work(undefined as never, 1));
+    const second = await scheduler.run('repo', 'same-key', 'request-2', () => work(undefined as never, 2));
+    expect(first).toBe(1);
+    expect(second).toBe(2);
+    expect(work).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects a duplicate requestId before entering the scheduler', async () => {
     const scheduler = new QueryScheduler({ globalLimit: 4, repositoryLimit: 2 });
     const work = vi.fn(async () => 1);

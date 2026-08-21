@@ -73,15 +73,24 @@ export class QueryScheduler {
         return value;
       })
       .then(
-        (value) => { for (const subscriber of entry.subscribers.values()) subscriber.resolve(value); },
-        (error: unknown) => { for (const subscriber of entry.subscribers.values()) subscriber.reject(error); },
-      )
-      .finally(() => {
-        entry.subscribers.clear();
-        this.inflight.delete(compound);
-        if (acquired) this.release(repositoryId);
-      });
+        (value) => {
+          // Retire the entry and release the slot BEFORE resolving subscribers:
+          // a same-key request arriving in the subscriber's continuation must
+          // observe a clean scheduler, not an entry about to be discarded.
+          this.finalize(compound, repositoryId, acquired);
+          for (const subscriber of entry.subscribers.values()) subscriber.resolve(value);
+        },
+        (error: unknown) => {
+          this.finalize(compound, repositoryId, acquired);
+          for (const subscriber of entry.subscribers.values()) subscriber.reject(error);
+        },
+      );
     return this.subscribe(entry, requestId);
+  }
+
+  private finalize(compound: string, repositoryId: string, acquired: boolean): void {
+    this.inflight.delete(compound);
+    if (acquired) this.release(repositoryId);
   }
 
   private subscribe<T>(entry: InflightEntry<T>, requestId: string): Promise<T> {
