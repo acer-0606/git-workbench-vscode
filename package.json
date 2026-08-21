@@ -582,5 +582,9 @@
         "gitWorkbench.safety.protectedBranches"
       ]
     }
+  },
+  "overrides": {
+    "serialize-javascript": "^7.1.0",
+    "diff": "^9.0.0"
   }
 }

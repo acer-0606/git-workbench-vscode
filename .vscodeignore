@@ -14,6 +14,7 @@ scripts/**
 config/**
 coverage/**
 **/__snapshots__/**
+dist/sbom.cdx.json
 dist-types/**
 node_modules/**
 package-lock.json
