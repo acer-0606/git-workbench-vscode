@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createNetServer, type Server } from 'node:net';
-import { access, mkdir, mkdtemp, rm, symlink, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, rm, symlink, unlink, writeFile, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -22,13 +22,14 @@ beforeAll(async () => {
   await execFileAsync('git', ['-C', fixtureDirectory, 'remote', 'add', 'counter', 'count::ignored']);
   helperDirectory = join(fixtureDirectory, 'helpers');
   await mkdir(helperDirectory);
-  if (process.platform === 'win32') {
-    helperMarker = join(fixtureDirectory, 'remote-helper-invoked');
-    await writeFile(join(helperDirectory, 'git-remote-count.cmd'), `@echo invoked>"${helperMarker}"\r\n`);
-  } else {
-    helperMarker = join(fixtureDirectory, 'counter');
-    await symlink('/usr/bin/touch', join(helperDirectory, 'git-remote-count'));
-  }
+  // Git for Windows runs transport helpers through its bundled sh, so a
+  // shebang script works on every platform (a .cmd helper would never be
+  // exec'd by the native git process).
+  helperMarker = join(fixtureDirectory, 'remote-helper-invoked');
+  const helperScript = join(helperDirectory, 'git-remote-count');
+  const markerForSh = helperMarker.split(/[\\\\]/).join('/');
+  await writeFile(helperScript, `#!/bin/sh\nprintf invoked > '${markerForSh}'\nexit 1\n`);
+  if (process.platform !== 'win32') await chmod(helperScript, 0o755);
 });
 
 afterAll(async () => {

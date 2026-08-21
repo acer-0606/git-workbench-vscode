@@ -39,7 +39,9 @@ describe('createRepositoryFixture', () => {
 
   test('creates an isolated repository that commits special file names', async () => {
     const fixture = await createFixture();
-    const fileName = '目录/space and\nnewline.txt';
+    // NTFS forbids newlines in file names; Windows keeps the unicode and
+    // tab coverage and skips only the newline variant.
+    const fileName = process.platform === 'win32' ? '目录/space and\ttabbed.txt' : '目录/space and\nnewline.txt';
 
     await fixture.write(fileName, 'fixture contents');
     const enableSigning = await fixture.runner.run({
@@ -70,7 +72,8 @@ describe('createRepositoryFixture', () => {
 
     expect(linked).not.toBe(fixture.path);
     await expect(access(join(linked, 'README.md'))).resolves.toBeUndefined();
-    await expect(runQuery(fixture, ['worktree', 'list', '--porcelain'])).resolves.toContain(`worktree ${linkedRealPath}\n`);
+    const linkedRealPathForGit = linkedRealPath.split(/[\\\\]/).join('/');
+    await expect(runQuery(fixture, ['worktree', 'list', '--porcelain'])).resolves.toContain(`worktree ${linkedRealPathForGit}\n`);
     await fixture.dispose();
     await expect(access(linked)).rejects.toMatchObject({ code: 'ENOENT' });
     await expect(access(fixture.path)).rejects.toMatchObject({ code: 'ENOENT' });
