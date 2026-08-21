@@ -38,6 +38,9 @@ async function createWorkspaceFixture(): Promise<WorkspaceFixture> {
     'gitWorkbench.safety.protectedBranches': ['workspace-only/*'],
   }, null, 2)}\n`);
   await execFileAsync('git', ['init', '--quiet'], { cwd: path });
+  await writeFile(join(path, 'README.md'), '# fixture\n');
+  await execFileAsync('git', ['-c', 'user.name=Git Workbench Test', '-c', 'user.email=test@git-workbench.invalid', 'add', 'README.md'], { cwd: path });
+  await execFileAsync('git', ['-c', 'user.name=Git Workbench Test', '-c', 'user.email=test@git-workbench.invalid', 'commit', '--quiet', '-m', 'fixture base'], { cwd: path });
   return { path, dangerousCommandMarker };
 }
 

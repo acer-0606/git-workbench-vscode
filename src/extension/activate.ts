@@ -9,6 +9,7 @@ import { QueryScheduler } from './query/queryScheduler.js';
 import { ReadModelService } from './query/readModelService.js';
 import { RepositoriesTreeDataProvider } from './views/repositoriesView.js';
 import { RefsTreeDataProvider } from './views/refsView.js';
+import { registerVirtualDocuments } from './virtualDocuments.js';
 
 interface LazyServices {
   readonly registry: RepositoryRegistry;
@@ -149,5 +150,6 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('gitWorkbench.repositories', repositoriesView),
     vscode.window.registerTreeDataProvider('gitWorkbench.refs', refsView),
+    registerVirtualDocuments(context, 'git'),
   );
 }
