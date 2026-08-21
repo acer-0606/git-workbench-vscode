@@ -22,7 +22,7 @@ export class RefsTreeDataProvider implements vscode.TreeDataProvider<string> {
   private readonly emitter = new vscode.EventEmitter<string | undefined>();
   private snapshot: RefsSnapshot | undefined;
 
-  constructor(private readonly loadRefs: () => Promise<RefsSnapshot>) {}
+  constructor(private readonly loadRefs: () => Promise<RefsSnapshot>, private readonly reportError?: (message: string) => void) {}
 
   get onDidChangeTreeData(): vscode.Event<string | undefined> {
     return this.emitter.event;
@@ -43,7 +43,14 @@ export class RefsTreeDataProvider implements vscode.TreeDataProvider<string> {
 
   async getChildren(element?: string): Promise<string[]> {
     if (!this.snapshot) {
-      this.snapshot = await this.loadRefs();
+      try {
+        this.snapshot = await this.loadRefs();
+      } catch (error) {
+        // Keep the group skeleton visible and surface the reason instead of
+        // silently rendering nothing at all.
+        this.reportError?.(`Refs 加载失败：${String(error)}`);
+        this.snapshot = { branches: [], tags: [], stashes: [], worktrees: [] };
+      }
     }
     if (element === undefined) return groups(this.snapshot).map((group) => group.label);
     return [...(groups(this.snapshot).find((group) => group.label === element)?.children ?? [])];

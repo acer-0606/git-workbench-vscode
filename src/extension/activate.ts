@@ -155,6 +155,8 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     if (!first) return { branches: [], tags: [], stashes: [], worktrees: [] };
     const snapshot = await service.refs(first.id, 1, `refs-${Date.now()}`) as { branches: { name: string; isHead: boolean }[]; tags: { name: string }[]; stashes: { subject: string }[]; worktrees: { path: string }[] };
     return { branches: snapshot.branches, tags: snapshot.tags, stashes: snapshot.stashes, worktrees: snapshot.worktrees };
+  }, (message) => {
+    services?.output.appendLine(message);
   });
   const repositoriesTreeView = vscode.window.createTreeView('gitWorkbench.repositories', { treeDataProvider: repositoriesView });
   const refsTreeView = vscode.window.createTreeView('gitWorkbench.refs', { treeDataProvider: refsView });
