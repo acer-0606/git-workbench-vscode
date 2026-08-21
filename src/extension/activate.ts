@@ -91,6 +91,10 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     await current.scheduler.runNow(workspaceFolders());
     current.output.appendLine(`Git Workbench ready (${current.registry.list().length} repositories)`);
     current.output.show(true);
+    // Discovery finished after the views first rendered empty: push the
+    // fresh registry into both trees now.
+    repositoriesView.refresh();
+    await refsView.refresh();
   }));
 
   // Views stay inert until VS Code makes them visible; the read service only
