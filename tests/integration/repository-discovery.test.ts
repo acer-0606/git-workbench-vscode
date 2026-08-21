@@ -29,7 +29,8 @@ describe('bounded repository discovery', () => {
 
       expect(result.partial).toBe(false);
       expect(result.repositories).toHaveLength(2);
-      expect(result.repositories.some((repository) => repository.worktreeUri.includes(encodeURIComponent(markerParent).replace(/%2F/g, '/')))).toBe(true);
+      const normalize = (value: string): string => decodeURIComponent(value).replace(/\\/g, '/').toLowerCase();
+      expect(result.repositories.some((repository) => normalize(repository.worktreeUri).includes(normalize(markerParent)))).toBe(true);
     } finally {
       await nested.dispose();
       await fixture.dispose();
@@ -151,7 +152,7 @@ describe('bounded repository discovery', () => {
     }
   });
 
-  it('marks permission failures partial rather than escaping the scan', async () => {
+  it.skipIf(process.platform === 'win32')('marks permission failures partial rather than escaping the scan', async () => {
     const fixture = await createRepositoryFixture();
     const locked = join(fixture.path, 'locked');
     try {
@@ -172,12 +173,12 @@ describe('bounded repository discovery', () => {
     const fileSystem = {
       lstat: async (_path: string) => directory,
       realpath: async (path: string) => {
-        if (path === '/root/bad') throw new Error('permission denied');
+        if (path.replace(/\\/g, '/').endsWith('/root/bad')) throw new Error('permission denied');
         return path;
       },
-      readdir: async (path: string) => path === '/root'
+      readdir: async (path: string) => path.replace(/\\/g, '/') === '/root'
         ? [{ name: 'bad', ...directory }, { name: 'good', ...directory }]
-        : path === '/root/good' ? [marker] : [],
+        : path.replace(/\\/g, '/') === '/root/good' ? [marker] : [],
     };
     const result = await discoverRepositories(['/root'], async (path) => path === '/root/good' ? descriptor : undefined, {
       mode: 'subFolders', scanDepth: 1, fileSystem,

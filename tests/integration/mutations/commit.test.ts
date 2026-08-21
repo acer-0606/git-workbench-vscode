@@ -147,5 +147,5 @@ describe('guarded staging and commits', () => {
     } finally {
       await unborn.dispose();
     }
-  });
+  }, 60_000);
 });

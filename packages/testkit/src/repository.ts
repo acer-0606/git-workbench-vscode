@@ -265,6 +265,10 @@ export async function createRepositoryFixture(options: RepositoryFixtureOptions 
     await manager.run(['init', '--initial-branch=main'], repositoryPath, 'mutation');
     await manager.run(['config', '--local', 'user.name', 'Git Workbench Test'], repositoryPath, 'mutation');
     await manager.run(['config', '--local', 'user.email', 'test@git-workbench.invalid'], repositoryPath, 'mutation');
+    // Git for Windows defaults core.autocrlf to true in the user scope;
+    // fixtures assert on exact bytes and must not be rewritten on checkout.
+    await manager.run(['config', '--local', 'core.autocrlf', 'false'], repositoryPath, 'mutation');
+    await manager.run(['config', '--local', 'core.eol', 'lf'], repositoryPath, 'mutation');
   } catch (error) {
     await manager.dispose().catch(() => undefined);
     throw error;

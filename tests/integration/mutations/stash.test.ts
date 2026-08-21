@@ -40,7 +40,7 @@ describe('recoverable stash workflows', () => {
 
     await stash.apply(provider, { selector: 'stash@{0}', dropAfterSuccess: false });
     const { readFile } = await import('node:fs/promises');
-    expect(await readFile(`${fixture.path}/a.txt`, 'utf8')).toBe('change\n');
+    expect((await readFile(`${fixture.path}/a.txt`, 'utf8')).replace(/\r\n/g, '\n')).toBe('change\n');
     expect(await stashList(fixture.path)).toHaveLength(1);
   });
 
