@@ -26,6 +26,10 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
   let workspaceFolderSubscription: vscode.Disposable | undefined;
   let workspaceTrustSubscription: vscode.Disposable | undefined;
   const workspaceFolders = (): readonly vscode.WorkspaceFolder[] => vscode.workspace.workspaceFolders ?? [];
+  // Every Git invocation resolves the executable through the same trusted
+  // configuration snapshot — never a bare "git" that may be missing from the
+  // GUI-launched extension host PATH (user git.path wins, then VS Code's).
+  const gitPathOf = (resource?: vscode.Uri): string => createVscodeConfigSnapshot(vscode.workspace.isTrusted, vscode.workspace, resource).gitPath;
   const refresh = async (
     current: LazyServices,
     folders: readonly vscode.WorkspaceFolder[],
@@ -112,7 +116,7 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
         status: async (repositoryId, generation, signal) => {
           const descriptor = registry.list().find((entry) => entry.id === repositoryId);
           if (!descriptor) throw new Error('repository not registered');
-          const runner = new GitProcessRunner('git');
+          const runner = new GitProcessRunner(gitPathOf(vscode.Uri.parse(descriptor.worktreeUri)));
           const result = await runner.run({ args: ['status', '--porcelain=v2', '-z', '--branch'], cwd: descriptor.worktreeUri, kind: 'query', maxStdoutBytes: 16 * 1024 * 1024, maxStderrBytes: 64 * 1024, signal });
           if (result.exitCode !== 0) throw new Error(`git status failed: ${result.stderrText()}`);
           return parseStatusV2(result.stdout, generation);
@@ -120,7 +124,7 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
         refs: async (repositoryId, generation, signal) => {
           const descriptor = registry.list().find((entry) => entry.id === repositoryId);
           if (!descriptor) throw new Error('repository not registered');
-          const runner = new GitProcessRunner('git');
+          const runner = new GitProcessRunner(gitPathOf(vscode.Uri.parse(descriptor.worktreeUri)));
           const [refs, worktrees] = await Promise.all([
             readRefs(runner, descriptor.worktreeUri),
             readWorktrees(runner, descriptor.worktreeUri),
@@ -138,7 +142,7 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
           const descriptor = registry.list().find((entry) => entry.id === repositoryId);
           if (!descriptor) throw new Error('repository not registered');
           const request = input as { readonly order: 'topo' | 'date' | 'authorDate'; readonly limit: number; readonly cursor?: string };
-          const runner = new GitProcessRunner('git');
+          const runner = new GitProcessRunner(gitPathOf(vscode.Uri.parse(descriptor.worktreeUri)));
           void signal;
           return readLogPage(runner, descriptor.worktreeUri, generation, request.order, request.limit, request.cursor);
         },
@@ -174,7 +178,7 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     refsTreeView,
     repositoriesTreeView.onDidChangeVisibility(discoverOnceVisible),
     refsTreeView.onDidChangeVisibility(discoverOnceVisible),
-    registerVirtualDocuments(context, 'git'),
+    registerVirtualDocuments(context, gitPathOf()),
   );
   discoverOnceVisible();
 
@@ -185,7 +189,7 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
   const conflictTree = new ConflictTreeDataProvider(async (path) => {
     const cwd = conflictCwd();
     if (!cwd) return;
-    const service = new ConflictService(cwd);
+    const service = new ConflictService(cwd, { gitPath: gitPathOf(vscode.Uri.file(cwd)) });
     const { conflicts } = await service.detect();
     const conflict = conflicts.find((candidate) => candidate.path === path);
     if (!conflict) return;
@@ -196,7 +200,7 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     registerConflictContentProvider(context, async (stage, path) => {
       const cwd = conflictCwd();
       if (!cwd) throw new Error('no workspace folder open');
-      const runner = new GitProcessRunner('git');
+      const runner = new GitProcessRunner(gitPathOf());
       const { readConflicts } = await import('@git-workbench/git-cli');
       const conflicts = await readConflicts(runner, cwd);
       const entry = conflicts.find((candidate) => candidate.path === path);
@@ -210,7 +214,7 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     vscode.commands.registerCommand('gitWorkbench.conflicts.refresh', async () => {
       const cwd = conflictCwd();
       if (!cwd) return;
-      const service = new ConflictService(cwd);
+      const service = new ConflictService(cwd, { gitPath: gitPathOf(vscode.Uri.file(cwd)) });
       const { conflicts } = await service.detect();
       conflictTree.update(conflicts);
     }),

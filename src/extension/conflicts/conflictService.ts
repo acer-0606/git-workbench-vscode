@@ -11,14 +11,27 @@ import { MergeEditorAdapter } from './mergeEditorAdapter.js';
  * user — the plugin never saves for them and never stages a stale disk
  * version; the confirmed bytes are frozen at click time.
  */
+export interface ConflictServiceOptions {
+  /** Git executable resolved through the trusted settings snapshot; the extension host PATH may not contain a bare `git`. */
+  readonly gitPath?: string;
+  readonly openDocument?: (uri: vscode.Uri) => Thenable<vscode.TextDocument>;
+  readonly showDocument?: (document: vscode.TextDocument) => Thenable<vscode.TextEditor>;
+}
+
 export class ConflictService {
-  private readonly runner = new GitProcessRunner('git');
+  private readonly runner: GitProcessRunner;
   private readonly provider: ReturnType<typeof createCliMutationProvider>;
   private readonly mergeEditor: MergeEditorAdapter;
+  private readonly openDocument: (uri: vscode.Uri) => Thenable<vscode.TextDocument>;
 
-  constructor(private readonly cwd: string, private readonly openDocument: (uri: vscode.Uri) => Thenable<vscode.TextDocument> = (uri) => vscode.workspace.openTextDocument(uri), private readonly showDocument: (document: vscode.TextDocument) => Thenable<vscode.TextEditor> = (document) => vscode.window.showTextDocument(document)) {
+  constructor(private readonly cwd: string, options: ConflictServiceOptions = {}) {
+    this.runner = new GitProcessRunner(options.gitPath ?? 'git');
     this.provider = createCliMutationProvider(this.runner, cwd);
-    this.mergeEditor = new MergeEditorAdapter(openDocument, showDocument);
+    this.openDocument = options.openDocument ?? ((uri) => vscode.workspace.openTextDocument(uri));
+    this.mergeEditor = new MergeEditorAdapter(
+      this.openDocument,
+      options.showDocument ?? ((document) => vscode.window.showTextDocument(document)),
+    );
   }
 
   async detect(): Promise<{ paused: Awaited<ReturnType<typeof reconstructPausedOperation>>; conflicts: readonly ConflictEntry[] }> {
