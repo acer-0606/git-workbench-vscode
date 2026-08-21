@@ -1,5 +1,14 @@
 import type { PresentedError } from '@git-workbench/domain';
 
+import type {
+  CompareFileRequest,
+  CompareOpenRequest,
+  ContentReadRequest,
+  LogPageRequest,
+  QueryCancelRequest,
+  RefsListRequest,
+} from './readModel.js';
+
 export interface RepositoryStatusRequest {
   readonly protocol: 1;
   readonly requestId: string;
@@ -13,7 +22,15 @@ export interface RepositoryListRequest {
   readonly type: 'repository.list';
 }
 
-export type HostRequest = RepositoryStatusRequest | RepositoryListRequest;
+export type HostRequest =
+  | RepositoryStatusRequest
+  | RepositoryListRequest
+  | LogPageRequest
+  | RefsListRequest
+  | CompareOpenRequest
+  | CompareFileRequest
+  | ContentReadRequest
+  | QueryCancelRequest;
 
 export type HostResponse<T = unknown> =
   | {

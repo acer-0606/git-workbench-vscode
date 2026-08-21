@@ -67,6 +67,49 @@ const presentedErrorSchema = {
   allOf: [{ oneOf: presentedErrorVariants }],
 } as const;
 
+const endpointKindSchema = {
+  enum: ['commit', 'branch', 'tag', 'stash', 'head', 'index', 'workingTree'],
+} as const;
+
+const compareEndpointSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['kind', 'value', 'label'],
+  properties: {
+    kind: endpointKindSchema,
+    value: { type: 'string', minLength: 1, maxLength: 512 },
+    label: { type: 'string', minLength: 1, maxLength: 512 },
+  },
+} as const;
+
+const ignoreWhitespaceSchema = {
+  enum: ['none', 'eol', 'all'],
+} as const;
+
+const compareModeSchema = {
+  enum: ['auto', 'direct', 'mergeBase'],
+} as const;
+
+const generationSchema = {
+  type: 'integer',
+  minimum: 0,
+  maximum: Number.MAX_SAFE_INTEGER,
+} as const;
+
+const readModelBaseProperties = {
+  protocol: { const: 1 },
+  requestId: requestIdSchema,
+  repositoryId: requestIdSchema,
+  generation: generationSchema,
+} as const;
+
+const logCursorSchema = {
+  type: 'string',
+  minLength: 1,
+  maxLength: 256,
+  pattern: '^[A-Za-z0-9_-]+$',
+} as const;
+
 export const hostRequestSchema = {
   oneOf: [
     {
@@ -88,6 +131,86 @@ export const hostRequestSchema = {
         requestId: requestIdSchema,
         type: { const: 'repository.status' },
         repositoryId: requestIdSchema,
+      },
+    },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['protocol', 'requestId', 'type', 'repositoryId', 'generation', 'order', 'limit'],
+      properties: {
+        ...readModelBaseProperties,
+        type: { const: 'log.page' },
+        order: { enum: ['topo', 'date', 'authorDate'] },
+        limit: { type: 'integer', minimum: 1, maximum: 1000 },
+        cursor: logCursorSchema,
+        filter: {
+          type: 'object',
+          additionalProperties: false,
+          maxProperties: 4,
+          properties: {
+            message: { type: 'string', minLength: 1, maxLength: 256 },
+            path: { type: 'string', minLength: 1, maxLength: 1024 },
+            sinceEpochSeconds: { type: 'integer', minimum: 0 },
+            untilEpochSeconds: { type: 'integer', minimum: 0 },
+          },
+        },
+      },
+    },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['protocol', 'requestId', 'type', 'repositoryId', 'generation'],
+      properties: {
+        ...readModelBaseProperties,
+        type: { const: 'refs.list' },
+      },
+    },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['protocol', 'requestId', 'type', 'repositoryId', 'generation', 'left', 'right', 'mode', 'ignoreWhitespace'],
+      properties: {
+        ...readModelBaseProperties,
+        type: { const: 'compare.open' },
+        left: compareEndpointSchema,
+        right: compareEndpointSchema,
+        mode: compareModeSchema,
+        ignoreWhitespace: ignoreWhitespaceSchema,
+      },
+    },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['protocol', 'requestId', 'type', 'repositoryId', 'generation', 'digest', 'path', 'ignoreWhitespace', 'pageStart', 'pageLimit'],
+      properties: {
+        ...readModelBaseProperties,
+        type: { const: 'compare.file' },
+        digest: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+        path: { type: 'string', minLength: 1, maxLength: 1024 },
+        ignoreWhitespace: ignoreWhitespaceSchema,
+        pageStart: { type: 'integer', minimum: 0 },
+        pageLimit: { type: 'integer', minimum: 1, maximum: 10_000 },
+      },
+    },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['protocol', 'requestId', 'type', 'repositoryId', 'generation', 'endpoint', 'path'],
+      properties: {
+        ...readModelBaseProperties,
+        type: { const: 'content.read' },
+        endpoint: compareEndpointSchema,
+        path: { type: 'string', minLength: 1, maxLength: 1024 },
+      },
+    },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['protocol', 'requestId', 'type', 'repositoryId', 'generation', 'cancelRequestId'],
+      properties: {
+        ...readModelBaseProperties,
+        type: { const: 'query.cancel' },
+        cancelRequestId: requestIdSchema,
       },
     },
   ],
