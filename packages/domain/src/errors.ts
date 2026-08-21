@@ -1,37 +1,46 @@
 import { asOperationId, type OperationId } from './ids.js';
 
-export type GitWorkbenchErrorCode =
-  | 'INVALID_INPUT'
-  | 'STALE_PLAN'
-  | 'REPOSITORY_LOCKED'
-  | 'WORKSPACE_UNTRUSTED'
-  | 'CONFLICT_PAUSED'
-  | 'POSTCONDITION_FAILED'
-  | 'AUTH_REQUIRED'
-  | 'LEASE_REJECTED'
-  | 'UNSUPPORTED_GIT_CAPABILITY'
-  | 'PARSER_UNSUPPORTED'
-  | 'MISSING_LOCAL_OBJECT'
-  | 'UNSAFE_LINE_SELECTION'
-  | 'TOO_LARGE'
-  | 'CORRUPT_REPOSITORY'
-  | 'CANCELLED';
+export const gitWorkbenchErrorCodes = [
+  'INVALID_INPUT',
+  'STALE_PLAN',
+  'REPOSITORY_LOCKED',
+  'WORKSPACE_UNTRUSTED',
+  'CONFLICT_PAUSED',
+  'POSTCONDITION_FAILED',
+  'AUTH_REQUIRED',
+  'LEASE_REJECTED',
+  'UNSUPPORTED_GIT_CAPABILITY',
+  'PARSER_UNSUPPORTED',
+  'MISSING_LOCAL_OBJECT',
+  'UNSAFE_LINE_SELECTION',
+  'TOO_LARGE',
+  'CORRUPT_REPOSITORY',
+  'CANCELLED',
+] as const;
 
-export type RetryAdvice =
-  | 'none'
-  | 'retry'
-  | 'refresh'
-  | 'reconcile'
-  | 'authenticate';
+export type GitWorkbenchErrorCode = (typeof gitWorkbenchErrorCodes)[number];
 
-export type SuggestedAction =
-  | 'retry'
-  | 'refresh'
-  | 'reconcile'
-  | 'authenticate'
-  | 'fetchMissingObjects'
-  | 'openRecovery'
-  | 'openDiagnostics';
+export const retryAdvices = [
+  'none',
+  'retry',
+  'refresh',
+  'reconcile',
+  'authenticate',
+] as const;
+
+export type RetryAdvice = (typeof retryAdvices)[number];
+
+export const suggestedActions = [
+  'retry',
+  'refresh',
+  'reconcile',
+  'authenticate',
+  'fetchMissingObjects',
+  'openRecovery',
+  'openDiagnostics',
+] as const;
+
+export type SuggestedAction = (typeof suggestedActions)[number];
 
 export interface GitWorkbenchErrorPayload {
   readonly code: GitWorkbenchErrorCode;
@@ -81,6 +90,26 @@ export interface PresentedError extends GitWorkbenchErrorPayload {
   readonly suggestedActions: readonly SuggestedAction[];
 }
 
+export function suggestedActionsForError(
+  code: GitWorkbenchErrorCode,
+  retry: RetryAdvice,
+): readonly SuggestedAction[] {
+  const primary: readonly SuggestedAction[] =
+    code === 'MISSING_LOCAL_OBJECT'
+      ? ['fetchMissingObjects']
+      : retry === 'retry'
+        ? ['retry']
+        : retry === 'refresh'
+          ? ['refresh']
+          : retry === 'reconcile'
+            ? ['reconcile', 'openRecovery']
+            : retry === 'authenticate'
+              ? ['authenticate']
+              : [];
+
+  return Object.freeze([...primary, 'openDiagnostics']);
+}
+
 export function toPresentedError(
   error: GitWorkbenchError,
   diagnosticsId: string,
@@ -89,22 +118,9 @@ export function toPresentedError(
     throw new TypeError('Invalid diagnostics id');
   }
 
-  const primary: SuggestedAction[] =
-    error.payload.code === 'MISSING_LOCAL_OBJECT'
-      ? ['fetchMissingObjects']
-      : error.payload.retry === 'retry'
-        ? ['retry']
-        : error.payload.retry === 'refresh'
-          ? ['refresh']
-          : error.payload.retry === 'reconcile'
-            ? ['reconcile', 'openRecovery']
-            : error.payload.retry === 'authenticate'
-              ? ['authenticate']
-              : [];
-
   return {
     ...error.toJSON(),
     diagnosticsId,
-    suggestedActions: Object.freeze([...primary, 'openDiagnostics']),
+    suggestedActions: suggestedActionsForError(error.payload.code, error.payload.retry),
   };
 }

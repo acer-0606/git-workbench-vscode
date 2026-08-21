@@ -12,6 +12,7 @@
     }
   },
   "dependencies": {
+    "@git-workbench/domain": "0.0.1",
     "ajv": "^8.20.0"
   }
 }

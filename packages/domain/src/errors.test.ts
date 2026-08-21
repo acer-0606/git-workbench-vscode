@@ -2,8 +2,11 @@ import { describe, expect, test } from 'vitest';
 
 import {
   GitWorkbenchError,
+  gitWorkbenchErrorCodes,
+  retryAdvices,
+  suggestedActions,
+  suggestedActionsForError,
   toPresentedError,
-  type GitWorkbenchErrorCode,
   type GitWorkbenchErrorInput,
   type RetryAdvice,
   type SuggestedAction,
@@ -120,6 +123,18 @@ describe('identifier validators', () => {
 });
 
 describe('GitWorkbenchError', () => {
+  test('exports the error vocabulary used by the protocol boundary', () => {
+    expect(gitWorkbenchErrorCodes).toContain('MISSING_LOCAL_OBJECT');
+    expect(retryAdvices).toEqual([
+      'none',
+      'retry',
+      'refresh',
+      'reconcile',
+      'authenticate',
+    ]);
+    expect(suggestedActions).toContain('openDiagnostics');
+  });
+
   test('serializes only the structured stale-plan payload and presents refresh guidance', () => {
     const payload: GitWorkbenchErrorInput = {
       code: 'STALE_PLAN',
@@ -226,46 +241,27 @@ describe('GitWorkbenchError', () => {
     );
   });
 
-  const presentedErrorCases: readonly {
-    readonly code: GitWorkbenchErrorCode;
-    readonly retry: RetryAdvice;
-    readonly suggestedActions: readonly SuggestedAction[];
-  }[] = [
-    {
-      code: 'INVALID_INPUT',
-      retry: 'none',
-      suggestedActions: ['openDiagnostics'],
-    },
-    {
-      code: 'INVALID_INPUT',
-      retry: 'retry',
-      suggestedActions: ['retry', 'openDiagnostics'],
-    },
-    {
-      code: 'INVALID_INPUT',
-      retry: 'refresh',
-      suggestedActions: ['refresh', 'openDiagnostics'],
-    },
-    {
-      code: 'INVALID_INPUT',
-      retry: 'reconcile',
-      suggestedActions: ['reconcile', 'openRecovery', 'openDiagnostics'],
-    },
-    {
-      code: 'INVALID_INPUT',
-      retry: 'authenticate',
-      suggestedActions: ['authenticate', 'openDiagnostics'],
-    },
-    {
-      code: 'MISSING_LOCAL_OBJECT',
-      retry: 'refresh',
-      suggestedActions: ['fetchMissingObjects', 'openDiagnostics'],
-    },
-  ];
+  const retryActions: Readonly<Record<RetryAdvice, readonly SuggestedAction[]>> = {
+    none: [],
+    retry: ['retry'],
+    refresh: ['refresh'],
+    reconcile: ['reconcile', 'openRecovery'],
+    authenticate: ['authenticate'],
+  };
 
-  test.each(presentedErrorCases)(
+  test.each(
+    gitWorkbenchErrorCodes.flatMap((code) =>
+      retryAdvices.map((retry) => ({ code, retry })),
+    ),
+  )(
     'presents $code/$retry with only its mapped actions and diagnostics',
-    ({ code, retry, suggestedActions }) => {
+    ({ code, retry }) => {
+      const expectedActions = [
+        ...(code === 'MISSING_LOCAL_OBJECT'
+          ? ['fetchMissingObjects']
+          : retryActions[retry]),
+        'openDiagnostics',
+      ];
       const presented = toPresentedError(
         new GitWorkbenchError({
           code,
@@ -276,7 +272,8 @@ describe('GitWorkbenchError', () => {
         'diag-1',
       );
 
-      expect(presented.suggestedActions).toEqual(suggestedActions);
+      expect(suggestedActionsForError(code, retry)).toEqual(expectedActions);
+      expect(presented.suggestedActions).toEqual(expectedActions);
       expect(
         presented.suggestedActions.filter((action) => action === 'openDiagnostics'),
       ).toHaveLength(1);
