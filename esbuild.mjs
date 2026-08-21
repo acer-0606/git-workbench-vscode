@@ -10,3 +10,16 @@ await build({
   external: ['vscode'],
   sourcemap: true,
 });
+
+await build({
+  entryPoints: ['webview/workbench/src/index.tsx'],
+  outfile: 'dist-webview/workbench.js',
+  bundle: true,
+  platform: 'browser',
+  format: 'iife',
+  target: 'chrome120',
+  jsx: 'automatic',
+  sourcemap: false,
+  minify: true,
+  define: { 'process.env.NODE_ENV': '"production"' },
+});

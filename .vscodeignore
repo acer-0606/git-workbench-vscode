@@ -6,6 +6,7 @@ docs/**
 tests/**
 packages/**
 src/**
+webview/**/dist/**
 webview/**/src/**
 webview/**/package.json
 webview/**/tsconfig.json
@@ -19,5 +20,5 @@ package-lock.json
 tsconfig*.json
 esbuild.mjs
 vitest.config.ts
-*.tsbuildinfo
+**/*.tsbuildinfo
 *.vsix

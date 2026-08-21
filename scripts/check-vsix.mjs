@@ -8,6 +8,8 @@ const allowlist = new Set([
   'README.md',
   'dist/extension.cjs',
   'dist/extension.cjs.map',
+  'dist-webview/workbench.js',
+  'media/workbench.svg',
   'package.json',
   'package.nls.json',
   'package.nls.zh-cn.json',

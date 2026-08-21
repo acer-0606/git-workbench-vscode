@@ -23,7 +23,7 @@
     "check": "npm run typecheck && npm run test:unit",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest",
-    "test:unit": "vitest run tests/contract tests/smoke packages src",
+    "test:unit": "vitest run tests/contract tests/smoke packages src webview",
     "test:integration": "vitest run tests/integration --pool=forks --maxWorkers=1",
     "build:vscode-tests": "tsc -p tests/vscode/tsconfig.json",
     "test:vscode": "npm run build:vscode-tests && node tests/vscode/out/run.js",
