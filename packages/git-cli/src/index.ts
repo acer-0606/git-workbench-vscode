@@ -18,3 +18,5 @@ export * from './remote.js';
 export * from './patchBuilder.js';
 export * from './rawDiff.js';
 export * from './applyPatch.js';
+export * from './ignore.js';
+export * from './worktree.js';
