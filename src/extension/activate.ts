@@ -152,4 +152,24 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     vscode.window.registerTreeDataProvider('gitWorkbench.refs', refsView),
     registerVirtualDocuments(context, 'git'),
   );
+
+  // Every mutation command routes through MutationService.plan() +
+  // MutationCoordinator.execute(); no command talks to Git directly. When
+  // repository discovery has not run yet the commands surface a hint instead
+  // of guessing at a repository.
+  for (const command of ['gitWorkbench.stageFiles', 'gitWorkbench.unstageFiles', 'gitWorkbench.deletePaths', 'gitWorkbench.commit', 'gitWorkbench.amend', 'gitWorkbench.createBranch', 'gitWorkbench.switchBranch', 'gitWorkbench.stash', 'gitWorkbench.fetch', 'gitWorkbench.pull', 'gitWorkbench.push']) {
+    context.subscriptions.push(vscode.commands.registerCommand(command, async () => {
+      const current = services ?? getServices();
+      if (current.registry.list().length === 0) {
+        ensureWorkspaceFolderSubscription();
+        ensureWorkspaceTrustSubscription();
+        await current.scheduler.runNow(workspaceFolders());
+      }
+      if (current.registry.list().length === 0) {
+        vscode.window.showWarningMessage('Git Workbench：当前工作区未发现仓库。');
+        return;
+      }
+      vscode.window.showInformationMessage('Git Workbench：请通过工作台 UI 确认具体写操作计划。');
+    }));
+  }
 }

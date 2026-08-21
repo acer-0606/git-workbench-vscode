@@ -54,6 +54,50 @@
       {
         "command": "gitWorkbench.open",
         "title": "%command.gitWorkbench.open%"
+      },
+      {
+        "command": "gitWorkbench.stageFiles",
+        "title": "%command.gitWorkbench.stageFiles%"
+      },
+      {
+        "command": "gitWorkbench.unstageFiles",
+        "title": "%command.gitWorkbench.unstageFiles%"
+      },
+      {
+        "command": "gitWorkbench.deletePaths",
+        "title": "%command.gitWorkbench.deletePaths%"
+      },
+      {
+        "command": "gitWorkbench.commit",
+        "title": "%command.gitWorkbench.commit%"
+      },
+      {
+        "command": "gitWorkbench.amend",
+        "title": "%command.gitWorkbench.amend%"
+      },
+      {
+        "command": "gitWorkbench.createBranch",
+        "title": "%command.gitWorkbench.createBranch%"
+      },
+      {
+        "command": "gitWorkbench.switchBranch",
+        "title": "%command.gitWorkbench.switchBranch%"
+      },
+      {
+        "command": "gitWorkbench.stash",
+        "title": "%command.gitWorkbench.stash%"
+      },
+      {
+        "command": "gitWorkbench.fetch",
+        "title": "%command.gitWorkbench.fetch%"
+      },
+      {
+        "command": "gitWorkbench.pull",
+        "title": "%command.gitWorkbench.pull%"
+      },
+      {
+        "command": "gitWorkbench.push",
+        "title": "%command.gitWorkbench.push%"
       }
     ],
     "configuration": {

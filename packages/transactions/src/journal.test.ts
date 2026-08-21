@@ -24,6 +24,7 @@ describe('journal state machine', () => {
     expect(canTransition('Checkpointed', 'Running')).toBe(true);
     expect(canTransition('Running', 'Verifying')).toBe(true);
     expect(canTransition('Verifying', 'Committed')).toBe(true);
+    expect(canTransition('Verifying', 'Verifying')).toBe(true);
     expect(canTransition('Verifying', 'RollingBack')).toBe(true);
     expect(canTransition('RollingBack', 'RolledBack')).toBe(true);
     expect(canTransition('Running', 'Paused')).toBe(true);
