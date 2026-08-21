@@ -25,9 +25,6 @@ jobs:
           path: |
             *.vsix
             dist/sbom.cdx.json
-      - uses: softprops/action-gh-release@<pin-to-40-char-sha-on-adoption>
-        if: false # enable only after the SHA is pinned and reviewed
-        with:
-          files: |
-            *.vsix
-            dist/sbom.cdx.json
+      # Release assets are attached with the gh CLI after the artifact
+      # checks pass; adopting a third-party release action requires a
+      # reviewed full-length SHA pin first.
