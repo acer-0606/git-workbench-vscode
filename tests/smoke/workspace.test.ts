@@ -38,15 +38,22 @@ describe('workspace manifest', () => {
     expect(manifest.devDependencies['@types/node']).toBe('20.19.43');
   });
 
-  it('skips settings synchronization until the schema is initialized', async () => {
+  it('synchronizes the initialized settings schema', async () => {
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
       ['scripts/sync-settings.mjs'],
       { cwd: process.cwd() },
     );
 
-    expect(stdout).toBe('settings schema not initialized; sync skipped\n');
+    expect(stdout).toBe('synchronized 38 Git Workbench settings\n');
     expect(stderr).toBe('');
+
+    const manifest = JSON.parse(
+      await readFile(packageJsonPath, 'utf8'),
+    ) as {
+      contributes: { configuration: { properties: Record<string, unknown> } };
+    };
+    expect(Object.keys(manifest.contributes.configuration.properties)).toHaveLength(38);
   });
 
   it('excludes the Vitest configuration from the VSIX', async () => {

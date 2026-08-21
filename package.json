@@ -44,5 +44,454 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",
     "vitest": "^4.1.11"
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Git Workbench",
+      "properties": {
+        "gitWorkbench.git.path": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "%config.gitWorkbench.git.path%"
+        },
+        "gitWorkbench.repositories.autoDetect": {
+          "type": "string",
+          "default": "openFolders",
+          "scope": "window",
+          "markdownDescription": "%config.gitWorkbench.repositories.autoDetect%",
+          "enum": [
+            "openFolders",
+            "subFolders",
+            "off"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.repositories.autoDetect.openFolders%",
+            "%enum.gitWorkbench.repositories.autoDetect.subFolders%",
+            "%enum.gitWorkbench.repositories.autoDetect.off%"
+          ]
+        },
+        "gitWorkbench.repositories.scanDepth": {
+          "type": "number",
+          "default": 2,
+          "scope": "window",
+          "markdownDescription": "%config.gitWorkbench.repositories.scanDepth%",
+          "minimum": 1,
+          "maximum": 5,
+          "multipleOf": 1
+        },
+        "gitWorkbench.ui.followActiveRepository": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "markdownDescription": "%config.gitWorkbench.ui.followActiveRepository%"
+        },
+        "gitWorkbench.ui.compactMode": {
+          "type": "string",
+          "default": "auto",
+          "scope": "window",
+          "markdownDescription": "%config.gitWorkbench.ui.compactMode%",
+          "enum": [
+            "auto",
+            "compact",
+            "comfortable"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.ui.compactMode.auto%",
+            "%enum.gitWorkbench.ui.compactMode.compact%",
+            "%enum.gitWorkbench.ui.compactMode.comfortable%"
+          ]
+        },
+        "gitWorkbench.graph.pageSize": {
+          "type": "number",
+          "default": 200,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.graph.pageSize%",
+          "minimum": 50,
+          "maximum": 1000,
+          "multipleOf": 1
+        },
+        "gitWorkbench.graph.maxLanes": {
+          "type": "number",
+          "default": 50,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.graph.maxLanes%",
+          "minimum": 8,
+          "maximum": 200,
+          "multipleOf": 1
+        },
+        "gitWorkbench.graph.order": {
+          "type": "string",
+          "default": "topo",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.graph.order%",
+          "enum": [
+            "topo",
+            "date",
+            "authorDate"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.graph.order.topo%",
+            "%enum.gitWorkbench.graph.order.date%",
+            "%enum.gitWorkbench.graph.order.authorDate%"
+          ]
+        },
+        "gitWorkbench.graph.showWorkingTree": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.graph.showWorkingTree%"
+        },
+        "gitWorkbench.graph.showRemoteBranches": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.graph.showRemoteBranches%"
+        },
+        "gitWorkbench.graph.showTags": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.graph.showTags%"
+        },
+        "gitWorkbench.graph.showStashes": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.graph.showStashes%"
+        },
+        "gitWorkbench.graph.showWorktrees": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.graph.showWorktrees%"
+        },
+        "gitWorkbench.compare.defaultMode": {
+          "type": "string",
+          "default": "auto",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.compare.defaultMode%",
+          "enum": [
+            "auto",
+            "direct",
+            "mergeBase"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.compare.defaultMode.auto%",
+            "%enum.gitWorkbench.compare.defaultMode.direct%",
+            "%enum.gitWorkbench.compare.defaultMode.mergeBase%"
+          ]
+        },
+        "gitWorkbench.compare.ignoreWhitespace": {
+          "type": "string",
+          "default": "none",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.compare.ignoreWhitespace%",
+          "enum": [
+            "none",
+            "eol",
+            "all"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.compare.ignoreWhitespace.none%",
+            "%enum.gitWorkbench.compare.ignoreWhitespace.eol%",
+            "%enum.gitWorkbench.compare.ignoreWhitespace.all%"
+          ]
+        },
+        "gitWorkbench.compare.renameDetection": {
+          "type": "string",
+          "default": "auto",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.compare.renameDetection%",
+          "enum": [
+            "auto",
+            "on",
+            "off"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.compare.renameDetection.auto%",
+            "%enum.gitWorkbench.compare.renameDetection.on%",
+            "%enum.gitWorkbench.compare.renameDetection.off%"
+          ]
+        },
+        "gitWorkbench.compare.maxFileSizeMB": {
+          "type": "number",
+          "default": 10,
+          "scope": "machine",
+          "markdownDescription": "%config.gitWorkbench.compare.maxFileSizeMB%",
+          "minimum": 1,
+          "maximum": 1024,
+          "multipleOf": 1
+        },
+        "gitWorkbench.compare.maxDiffLines": {
+          "type": "number",
+          "default": 20000,
+          "scope": "machine",
+          "markdownDescription": "%config.gitWorkbench.compare.maxDiffLines%",
+          "minimum": 1000,
+          "maximum": 200000,
+          "multipleOf": 1
+        },
+        "gitWorkbench.apply.defaultTarget": {
+          "type": "string",
+          "default": "prompt",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.apply.defaultTarget%",
+          "enum": [
+            "prompt",
+            "worktree",
+            "index",
+            "newWorktree"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.apply.defaultTarget.prompt%",
+            "%enum.gitWorkbench.apply.defaultTarget.worktree%",
+            "%enum.gitWorkbench.apply.defaultTarget.index%",
+            "%enum.gitWorkbench.apply.defaultTarget.newWorktree%"
+          ]
+        },
+        "gitWorkbench.commit.smartCommit": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.commit.smartCommit%"
+        },
+        "gitWorkbench.pull.strategy": {
+          "type": "string",
+          "default": "inherit",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.pull.strategy%",
+          "enum": [
+            "inherit",
+            "prompt",
+            "ffOnly",
+            "merge",
+            "rebase"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.pull.strategy.inherit%",
+            "%enum.gitWorkbench.pull.strategy.prompt%",
+            "%enum.gitWorkbench.pull.strategy.ffOnly%",
+            "%enum.gitWorkbench.pull.strategy.merge%",
+            "%enum.gitWorkbench.pull.strategy.rebase%"
+          ]
+        },
+        "gitWorkbench.fetch.prune": {
+          "type": "string",
+          "default": "inherit",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.fetch.prune%",
+          "enum": [
+            "inherit",
+            "on",
+            "off"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.fetch.prune.inherit%",
+            "%enum.gitWorkbench.fetch.prune.on%",
+            "%enum.gitWorkbench.fetch.prune.off%"
+          ]
+        },
+        "gitWorkbench.remote.autoFetch": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.remote.autoFetch%"
+        },
+        "gitWorkbench.remote.autoFetchIntervalMinutes": {
+          "type": "number",
+          "default": 10,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.remote.autoFetchIntervalMinutes%",
+          "minimum": 5,
+          "maximum": 1440,
+          "multipleOf": 1
+        },
+        "gitWorkbench.branch.dirtyWorktreeStrategy": {
+          "type": "string",
+          "default": "prompt",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.branch.dirtyWorktreeStrategy%",
+          "enum": [
+            "prompt",
+            "keep",
+            "stash",
+            "newWorktree"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.branch.dirtyWorktreeStrategy.prompt%",
+            "%enum.gitWorkbench.branch.dirtyWorktreeStrategy.keep%",
+            "%enum.gitWorkbench.branch.dirtyWorktreeStrategy.stash%",
+            "%enum.gitWorkbench.branch.dirtyWorktreeStrategy.newWorktree%"
+          ]
+        },
+        "gitWorkbench.stash.includeUntracked": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.stash.includeUntracked%"
+        },
+        "gitWorkbench.conflict.autoOpen": {
+          "type": "string",
+          "default": "prompt",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.conflict.autoOpen%",
+          "enum": [
+            "prompt",
+            "first",
+            "never"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.conflict.autoOpen.prompt%",
+            "%enum.gitWorkbench.conflict.autoOpen.first%",
+            "%enum.gitWorkbench.conflict.autoOpen.never%"
+          ]
+        },
+        "gitWorkbench.safety.mode": {
+          "type": "string",
+          "default": "balanced",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.safety.mode%",
+          "enum": [
+            "balanced",
+            "strict"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.safety.mode.balanced%",
+            "%enum.gitWorkbench.safety.mode.strict%"
+          ]
+        },
+        "gitWorkbench.safety.protectedBranches": {
+          "type": "array",
+          "default": [
+            "main",
+            "master",
+            "release/*"
+          ],
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.safety.protectedBranches%",
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "gitWorkbench.safety.publishedRewrite": {
+          "type": "string",
+          "default": "confirm",
+          "scope": "resource",
+          "markdownDescription": "%config.gitWorkbench.safety.publishedRewrite%",
+          "enum": [
+            "deny",
+            "confirm"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.safety.publishedRewrite.deny%",
+            "%enum.gitWorkbench.safety.publishedRewrite.confirm%"
+          ]
+        },
+        "gitWorkbench.safety.checkpointRetentionDays": {
+          "type": "number",
+          "default": 30,
+          "scope": "machine",
+          "markdownDescription": "%config.gitWorkbench.safety.checkpointRetentionDays%",
+          "minimum": 1,
+          "maximum": 365,
+          "multipleOf": 1
+        },
+        "gitWorkbench.safety.checkpointMaxCount": {
+          "type": "number",
+          "default": 50,
+          "scope": "machine",
+          "markdownDescription": "%config.gitWorkbench.safety.checkpointMaxCount%",
+          "minimum": 5,
+          "maximum": 500,
+          "multipleOf": 1
+        },
+        "gitWorkbench.safety.checkpointMaxDiskMB": {
+          "type": "number",
+          "default": 2048,
+          "scope": "machine",
+          "markdownDescription": "%config.gitWorkbench.safety.checkpointMaxDiskMB%",
+          "minimum": 256,
+          "maximum": 102400,
+          "multipleOf": 1
+        },
+        "gitWorkbench.performance.profile": {
+          "type": "string",
+          "default": "auto",
+          "scope": "machine",
+          "markdownDescription": "%config.gitWorkbench.performance.profile%",
+          "enum": [
+            "auto",
+            "balanced",
+            "largeRepository"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.performance.profile.auto%",
+            "%enum.gitWorkbench.performance.profile.balanced%",
+            "%enum.gitWorkbench.performance.profile.largeRepository%"
+          ]
+        },
+        "gitWorkbench.performance.maxCacheMB": {
+          "type": "number",
+          "default": 150,
+          "scope": "machine",
+          "markdownDescription": "%config.gitWorkbench.performance.maxCacheMB%",
+          "minimum": 50,
+          "maximum": 2048,
+          "multipleOf": 1
+        },
+        "gitWorkbench.performance.maxConcurrentReads": {
+          "type": "number",
+          "default": 4,
+          "scope": "machine",
+          "markdownDescription": "%config.gitWorkbench.performance.maxConcurrentReads%",
+          "minimum": 1,
+          "maximum": 8,
+          "multipleOf": 1
+        },
+        "gitWorkbench.logging.level": {
+          "type": "string",
+          "default": "error",
+          "scope": "application",
+          "markdownDescription": "%config.gitWorkbench.logging.level%",
+          "enum": [
+            "off",
+            "error",
+            "warn",
+            "info",
+            "debug",
+            "trace"
+          ],
+          "markdownEnumDescriptions": [
+            "%enum.gitWorkbench.logging.level.off%",
+            "%enum.gitWorkbench.logging.level.error%",
+            "%enum.gitWorkbench.logging.level.warn%",
+            "%enum.gitWorkbench.logging.level.info%",
+            "%enum.gitWorkbench.logging.level.debug%",
+            "%enum.gitWorkbench.logging.level.trace%"
+          ]
+        },
+        "gitWorkbench.diagnostics.redactPaths": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "%config.gitWorkbench.diagnostics.redactPaths%"
+        }
+      }
+    }
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "restrictedConfigurations": [
+        "gitWorkbench.repositories.autoDetect",
+        "gitWorkbench.repositories.scanDepth",
+        "gitWorkbench.safety.protectedBranches"
+      ]
+    }
   }
 }
