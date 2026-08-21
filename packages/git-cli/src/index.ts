@@ -20,3 +20,5 @@ export * from './rawDiff.js';
 export * from './applyPatch.js';
 export * from './ignore.js';
 export * from './worktree.js';
+export * from './sequencer.js';
+export * from './sequencerActions.js';

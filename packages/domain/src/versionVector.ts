@@ -7,7 +7,8 @@ export interface FileVersion {
   readonly documentDirty?: boolean;
 }
 
-export type PausedOperationKind = 'none' | 'merge' | 'rebase' | 'cherryPick' | 'revert' | 'pullMerge' | 'pullRebase' | 'stashApply';
+export type { PausedOperationKind } from './pausedOperation.js';
+type VersionVectorPausedOperation = import('./pausedOperation.js').PausedOperationKind | 'none';
 
 export interface RefVersion {
   readonly ref: string;
@@ -21,7 +22,7 @@ export interface VersionVector {
   readonly headOid?: string;
   readonly headName?: string;
   readonly indexFingerprint: string;
-  readonly pausedOperation: PausedOperationKind;
+  readonly pausedOperation: VersionVectorPausedOperation;
   readonly refs: readonly RefVersion[];
   readonly files: readonly FileVersion[];
 }

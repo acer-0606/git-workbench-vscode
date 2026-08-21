@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
-import type { FileVersion, PausedOperationKind, VersionVector } from '@git-workbench/domain';
+import type { FileVersion, VersionVector } from '@git-workbench/domain';
 
 import type { GitProcessRunner } from './process.js';
 
@@ -15,7 +15,9 @@ export interface CaptureOptions {
   readonly paths?: readonly string[];
 }
 
-const pausedHeadFiles: readonly { readonly file: string; readonly kind: PausedOperationKind }[] = [
+type PausedKind = import('@git-workbench/domain').PausedOperationKind;
+
+const pausedHeadFiles: readonly { readonly file: string; readonly kind: PausedKind }[] = [
   { file: 'MERGE_HEAD', kind: 'merge' },
   { file: 'REBASE_HEAD', kind: 'rebase' },
   { file: 'CHERRY_PICK_HEAD', kind: 'cherryPick' },
@@ -43,7 +45,7 @@ export async function captureVersionVector(runner: GitProcessRunner, cwd: string
   const indexBytes = await readFile(await readGitPath(runner, cwd, 'index')).catch(() => Buffer.alloc(0));
   const indexStats = await stat(await readGitPath(runner, cwd, 'index')).catch(() => undefined);
 
-  let pausedOperation: PausedOperationKind = 'none';
+  let pausedOperation: PausedKind | 'none' = 'none';
   for (const candidate of pausedHeadFiles) {
     const probe = await runner.run({ args: ['rev-parse', '--verify', '-q', '--end-of-options', candidate.file], cwd, kind: 'query', maxStdoutBytes: 256, maxStderrBytes: 64 * 1024 });
     if (probe.exitCode === 0) {
