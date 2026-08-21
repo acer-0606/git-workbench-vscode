@@ -46,6 +46,12 @@
     "vitest": "^4.1.11"
   },
   "contributes": {
+    "commands": [
+      {
+        "command": "gitWorkbench.open",
+        "title": "%command.gitWorkbench.open%"
+      }
+    ],
     "configuration": {
       "title": "Git Workbench",
       "properties": {

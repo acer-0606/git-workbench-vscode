@@ -1,4 +1,5 @@
 {
+  "command.gitWorkbench.open": "打开 Git 工作台",
   "config.gitWorkbench.git.path": "Git 可执行文件路径。空值表示优先继承 VS Code 的 `git.path`，否则使用当前运行环境中的系统 Git。工作区不能设置该值。",
   "config.gitWorkbench.repositories.autoDetect": "仓库发现范围：`openFolders` 仅检测已打开 Folder；`subFolders` 扫描子目录；`off` 仅使用手动仓库。不会扫描整个磁盘。",
   "enum.gitWorkbench.repositories.autoDetect.openFolders": "仅检测已打开 Folder。",

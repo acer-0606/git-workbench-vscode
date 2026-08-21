@@ -16,6 +16,10 @@ export interface GitProbeRunner {
   run(request: GitRunRequest): Promise<GitRunResult>;
 }
 
+function withSignal(request: GitRunRequest, signal: AbortSignal | undefined): GitRunRequest {
+  return signal === undefined ? request : { ...request, signal };
+}
+
 export function decideRepositoryMode(capabilities: Omit<GitCapabilities, 'version' | 'objectFormat'>): RepositoryMode {
   return capabilities.supportedBaseline
     && capabilities.porcelainV2
@@ -36,6 +40,7 @@ function isSupportedBaseline(version: string): boolean {
 }
 
 async function runProbe(runner: GitProbeRunner, request: GitRunRequest): Promise<GitRunResult | undefined> {
+  if (request.signal?.aborted) return undefined;
   try {
     return await runner.run(request);
   } catch {
@@ -47,35 +52,35 @@ async function runProbe(runner: GitProbeRunner, request: GitRunRequest): Promise
 export async function probeGit(
   runner: GitProbeRunner,
   cwd: string,
-  options: { readonly trusted: boolean },
+  options: { readonly trusted: boolean; readonly signal?: AbortSignal },
 ): Promise<GitCapabilities> {
-  const versionResult = await runProbe(runner, {
+  const versionResult = await runProbe(runner, withSignal({
     args: ['--version'], cwd, kind: 'query', maxStdoutBytes: 4096, maxStderrBytes: 4096,
-  });
-  const objectFormatResult = await runProbe(runner, {
+  }, options.signal));
+  const objectFormatResult = await runProbe(runner, withSignal({
     args: ['rev-parse', '--show-object-format'], cwd, kind: 'query', maxStdoutBytes: 128, maxStderrBytes: 4096,
-  });
-  const noLazyFetchResult = await runProbe(runner, {
+  }, options.signal));
+  const noLazyFetchResult = await runProbe(runner, withSignal({
     args: ['--no-lazy-fetch', '--version'], cwd, kind: 'query', maxStdoutBytes: 4096, maxStderrBytes: 4096,
-  });
+  }, options.signal));
   const statusResult = options.trusted
-    ? await runProbe(runner, {
+    ? await runProbe(runner, withSignal({
       args: ['-c', 'core.fsmonitor=false', 'status', '--porcelain=v2', '-z', '--branch', '--untracked-files=no'],
       cwd,
       kind: 'query',
       maxStdoutBytes: 1024 * 1024,
       maxStderrBytes: 4096,
-    })
+    }, options.signal))
     : undefined;
   const updateRefResult = options.trusted
-    ? await runProbe(runner, {
+    ? await runProbe(runner, withSignal({
       args: ['update-ref', '--stdin'],
       cwd,
       kind: 'query',
       stdin: Buffer.from('start\nabort\n'),
       maxStdoutBytes: 4096,
       maxStderrBytes: 4096,
-    })
+    }, options.signal))
     : undefined;
 
   const version = versionResult?.exitCode === 0
