@@ -1,0 +1,40 @@
+name: nightly
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  support-matrix:
+    name: ${{ matrix.os }} / ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+          - os: windows-2022
+            arch: x64
+          - os: ubuntu-24.04
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node scripts/check-settings.mjs && node scripts/check-localization.mjs
+      - run: npm run check
+      - run: npm run test:integration
+      - run: npx vitest run tests/e2e tests/fault-injection --pool=forks --maxWorkers=1
+      - run: xvfb-run -a npm run test:vscode
+        if: runner.os == 'Linux'
+      - run: npm run test:vscode
+        if: runner.os != 'Linux'
+      - run: npm run test:performance
+      - run: npm run package && node scripts/check-vsix.mjs

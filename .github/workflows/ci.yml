@@ -26,6 +26,7 @@ jobs:
       - run: npm ci
       - run: npm run sync:settings
       - run: git diff --exit-code
+      - run: npm run check:settings
       - run: npm run check
       - run: npm run test:integration
       - run: npx vitest run tests/e2e --pool=forks --maxWorkers=1

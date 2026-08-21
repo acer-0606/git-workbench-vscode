@@ -1,0 +1,33 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: write
+jobs:
+  vsix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm sbom --sbom-format cyclonedx > dist/sbom.cdx.json
+      - run: npm run package
+      - run: node scripts/check-vsix.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: git-workbench-release
+          path: |
+            *.vsix
+            dist/sbom.cdx.json
+      - uses: softprops/action-gh-release@<pin-to-40-char-sha-on-adoption>
+        if: false # enable only after the SHA is pinned and reviewed
+        with:
+          files: |
+            *.vsix
+            dist/sbom.cdx.json

@@ -8,3 +8,4 @@ export * from './repository.js';
 export * from './patch.js';
 export * from './pausedOperation.js';
 export * from './conflict.js';
+export * from './futureProviders.js';
