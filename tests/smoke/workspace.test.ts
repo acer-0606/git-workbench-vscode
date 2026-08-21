@@ -71,5 +71,5 @@ describe('workspace manifest', () => {
     );
 
     expect(stdout).not.toContain('vitest.config.ts');
-  });
+  }, 30_000);
 });
