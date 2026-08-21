@@ -7,3 +7,4 @@ export * from './log.js';
 export * from './refs.js';
 export * from './diff.js';
 export * from './content.js';
+export * from './versionVector.js';
