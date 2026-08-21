@@ -15,3 +15,6 @@ export * from './branch.js';
 export * from './stash.js';
 export * from './commitActions.js';
 export * from './remote.js';
+export * from './patchBuilder.js';
+export * from './rawDiff.js';
+export * from './applyPatch.js';
