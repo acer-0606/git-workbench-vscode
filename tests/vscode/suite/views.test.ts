@@ -16,7 +16,7 @@ suite('native views', () => {
     const extension = vscode.extensions.getExtension('git-workbench-project.git-workbench');
     assert.ok(extension);
     const views = extension.packageJSON.contributes.views.gitWorkbench as Array<{ id: string }>;
-    assert.deepStrictEqual(views.map((view) => view.id), ['gitWorkbench.repositories', 'gitWorkbench.refs']);
+    assert.deepStrictEqual(views.map((view) => view.id), ['gitWorkbench.repositories', 'gitWorkbench.refs', 'gitWorkbench.conflicts']);
   });
 
   test('registers tree data providers without touching Git at activation', async () => {

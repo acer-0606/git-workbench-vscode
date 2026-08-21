@@ -23,3 +23,4 @@ export * from './worktree.js';
 export * from './sequencer.js';
 export * from './sequencerActions.js';
 export * from './history.js';
+export * from './conflictResolution.js';

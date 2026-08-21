@@ -10,6 +10,9 @@ import { ReadModelService } from './query/readModelService.js';
 import { RepositoriesTreeDataProvider } from './views/repositoriesView.js';
 import { RefsTreeDataProvider } from './views/refsView.js';
 import { registerVirtualDocuments } from './virtualDocuments.js';
+import { ConflictService } from './conflicts/conflictService.js';
+import { ConflictTreeDataProvider } from './conflicts/conflictView.js';
+import { MergeEditorAdapter, registerConflictContentProvider } from './conflicts/mergeEditorAdapter.js';
 
 interface LazyServices {
   readonly registry: RepositoryRegistry;
@@ -152,6 +155,45 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
     vscode.window.registerTreeDataProvider('gitWorkbench.refs', refsView),
     registerVirtualDocuments(context, 'git'),
   );
+
+  // Conflicts surface: a fixed tree of conflicted paths plus the optional
+  // merge-editor integration. Binary/delete-modify/submodule kinds are
+  // rejected by the service itself and never reach a text editor.
+  const conflictCwd = (): string | undefined => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const conflictTree = new ConflictTreeDataProvider(async (path) => {
+    const cwd = conflictCwd();
+    if (!cwd) return;
+    const service = new ConflictService(cwd);
+    const { conflicts } = await service.detect();
+    const conflict = conflicts.find((candidate) => candidate.path === path);
+    if (!conflict) return;
+    await service.openConflict(conflict, await vscode.commands.getCommands(true));
+  });
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('gitWorkbench.conflicts', conflictTree),
+    registerConflictContentProvider(context, async (stage, path) => {
+      const cwd = conflictCwd();
+      if (!cwd) throw new Error('no workspace folder open');
+      const runner = new GitProcessRunner('git');
+      const { readConflicts } = await import('@git-workbench/git-cli');
+      const conflicts = await readConflicts(runner, cwd);
+      const entry = conflicts.find((candidate) => candidate.path === path);
+      const oid = entry?.stages.find((candidate) => candidate.stage === stage)?.oid;
+      if (!oid) throw new Error(`stage ${stage} missing for ${path}`);
+      const result = await runner.run({ args: ['cat-file', 'blob', oid], cwd, kind: 'query', maxStdoutBytes: 32 * 1024 * 1024, maxStderrBytes: 64 * 1024 });
+      if (result.exitCode !== 0) throw new Error('conflict content unavailable');
+      return result.stdoutText();
+    }),
+    vscode.commands.registerCommand('gitWorkbench.conflicts.open', async (path: string) => conflictTree.activate(String(path))),
+    vscode.commands.registerCommand('gitWorkbench.conflicts.refresh', async () => {
+      const cwd = conflictCwd();
+      if (!cwd) return;
+      const service = new ConflictService(cwd);
+      const { conflicts } = await service.detect();
+      conflictTree.update(conflicts);
+    }),
+  );
+  void MergeEditorAdapter;
 
   // Every mutation command routes through MutationService.plan() +
   // MutationCoordinator.execute(); no command talks to Git directly. When

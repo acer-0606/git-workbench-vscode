@@ -98,6 +98,14 @@
       {
         "command": "gitWorkbench.push",
         "title": "%command.gitWorkbench.push%"
+      },
+      {
+        "command": "gitWorkbench.conflicts.open",
+        "title": "%command.gitWorkbench.conflicts.open%"
+      },
+      {
+        "command": "gitWorkbench.conflicts.refresh",
+        "title": "%command.gitWorkbench.conflicts.refresh%"
       }
     ],
     "configuration": {
@@ -555,6 +563,11 @@
         {
           "id": "gitWorkbench.refs",
           "name": "Refs"
+        },
+        {
+          "id": "gitWorkbench.conflicts",
+          "name": "Conflicts",
+          "when": "gitWorkbench.hasConflicts"
         }
       ]
     }

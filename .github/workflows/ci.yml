@@ -28,6 +28,7 @@ jobs:
       - run: git diff --exit-code
       - run: npm run check
       - run: npm run test:integration
+      - run: npx vitest run tests/e2e --pool=forks --maxWorkers=1
       - run: npm run build
       - if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:vscode

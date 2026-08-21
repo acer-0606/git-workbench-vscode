@@ -11,6 +11,8 @@
   "command.gitWorkbench.fetch": "Fetch",
   "command.gitWorkbench.pull": "Pull",
   "command.gitWorkbench.push": "Push",
+  "command.gitWorkbench.conflicts.open": "Open Conflict",
+  "command.gitWorkbench.conflicts.refresh": "Refresh Conflicts",
   "config.gitWorkbench.git.path": "Path to the Git executable. An empty value first inherits VS Code's `git.path`; otherwise the system Git in the current runtime environment is used. This value cannot be set by a workspace.",
   "config.gitWorkbench.repositories.autoDetect": "Repository discovery scope: `openFolders` detects only opened folders; `subFolders` scans subdirectories; `off` uses manually added repositories only. The whole disk is never scanned.",
   "enum.gitWorkbench.repositories.autoDetect.openFolders": "Detect opened folders only.",
