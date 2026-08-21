@@ -51,6 +51,12 @@ function assertSupportedPathComponents(requestedPath: string): void {
     if (component.includes(':') || component.endsWith('.') || component.endsWith(' ') || isWindowsReservedName(component) || isGitMetadataAlias(component)) {
       throw new TypeError('Fixture file path contains a platform-ambiguous component that is not supported');
     }
+    // NTFS accepts control characters in names, but Windows rename/move
+    // fails with a misleading ENOENT for such destinations. Reject them
+    // explicitly instead of failing deep inside a write.
+    if (process.platform === 'win32' && /[\x00-\x1f]/u.test(component)) {
+      throw new TypeError('Fixture file path contains control characters that Windows rename cannot target');
+    }
   }
 }
 

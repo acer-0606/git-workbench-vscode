@@ -39,9 +39,9 @@ describe('createRepositoryFixture', () => {
 
   test('creates an isolated repository that commits special file names', async () => {
     const fixture = await createFixture();
-    // NTFS forbids newlines in file names; Windows keeps the unicode and
-    // tab coverage and skips only the newline variant.
-    const fileName = process.platform === 'win32' ? '目录/space and\ttabbed.txt' : '目录/space and\nnewline.txt';
+    // Control characters (newline/tab) cannot be rename targets on Windows;
+    // each platform exercises the names its file system actually supports.
+    const fileName = process.platform === 'win32' ? '目录/space and dots.in name.txt' : '目录/space and\nnewline.txt';
 
     await fixture.write(fileName, 'fixture contents');
     const enableSigning = await fixture.runner.run({
