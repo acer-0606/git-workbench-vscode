@@ -116,18 +116,20 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
         status: async (repositoryId, generation, signal) => {
           const descriptor = registry.list().find((entry) => entry.id === repositoryId);
           if (!descriptor) throw new Error('repository not registered');
-          const runner = new GitProcessRunner(gitPathOf(vscode.Uri.parse(descriptor.worktreeUri)));
-          const result = await runner.run({ args: ['status', '--porcelain=v2', '-z', '--branch'], cwd: descriptor.worktreeUri, kind: 'query', maxStdoutBytes: 16 * 1024 * 1024, maxStderrBytes: 64 * 1024, signal });
+          const worktree = vscode.Uri.parse(descriptor.worktreeUri).fsPath;
+          const runner = new GitProcessRunner(gitPathOf(vscode.Uri.file(worktree)));
+          const result = await runner.run({ args: ['status', '--porcelain=v2', '-z', '--branch'], cwd: worktree, kind: 'query', maxStdoutBytes: 16 * 1024 * 1024, maxStderrBytes: 64 * 1024, signal });
           if (result.exitCode !== 0) throw new Error(`git status failed: ${result.stderrText()}`);
           return parseStatusV2(result.stdout, generation);
         },
         refs: async (repositoryId, generation, signal) => {
           const descriptor = registry.list().find((entry) => entry.id === repositoryId);
           if (!descriptor) throw new Error('repository not registered');
-          const runner = new GitProcessRunner(gitPathOf(vscode.Uri.parse(descriptor.worktreeUri)));
+          const worktree = vscode.Uri.parse(descriptor.worktreeUri).fsPath;
+          const runner = new GitProcessRunner(gitPathOf(vscode.Uri.file(worktree)));
           const [refs, worktrees] = await Promise.all([
-            readRefs(runner, descriptor.worktreeUri),
-            readWorktrees(runner, descriptor.worktreeUri),
+            readRefs(runner, worktree),
+            readWorktrees(runner, worktree),
           ]);
           void signal;
           void generation;
@@ -142,9 +144,10 @@ export async function activateExtension(context: vscode.ExtensionContext): Promi
           const descriptor = registry.list().find((entry) => entry.id === repositoryId);
           if (!descriptor) throw new Error('repository not registered');
           const request = input as { readonly order: 'topo' | 'date' | 'authorDate'; readonly limit: number; readonly cursor?: string };
-          const runner = new GitProcessRunner(gitPathOf(vscode.Uri.parse(descriptor.worktreeUri)));
+          const worktree = vscode.Uri.parse(descriptor.worktreeUri).fsPath;
+          const runner = new GitProcessRunner(gitPathOf(vscode.Uri.file(worktree)));
           void signal;
-          return readLogPage(runner, descriptor.worktreeUri, generation, request.order, request.limit, request.cursor);
+          return readLogPage(runner, worktree, generation, request.order, request.limit, request.cursor);
         },
       },
     );
