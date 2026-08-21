@@ -1,4 +1,5 @@
 export * from './ports.js';
+export * from './mutationProvider.js';
 export * from './process.js';
 export * from './capabilities.js';
 export * from './status.js';
@@ -8,3 +9,5 @@ export * from './refs.js';
 export * from './diff.js';
 export * from './content.js';
 export * from './versionVector.js';
+export * from './stage.js';
+export * from './commit.js';

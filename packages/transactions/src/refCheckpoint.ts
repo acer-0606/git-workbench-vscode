@@ -41,13 +41,15 @@ export async function captureRefCheckpoint(
     const result = await provider.runner.run({ args: ['rev-parse', '--verify', '--end-of-options', ref], cwd: provider.cwd, kind: 'query', maxStdoutBytes: 256, maxStderrBytes: 64 * 1024 });
     refStates.push(result.exitCode === 0 ? { ref, oid: result.stdoutText().trim() } : { ref });
   }
-  const indexBytes = await readFile(await locateIndex(provider));
-  const stats = await stat(await locateIndex(provider));
+  // Git deletes the index file when the last entry is removed; a missing
+  // index is a valid state and snapshots as an empty buffer.
+  const indexBytes = await readFile(await locateIndex(provider)).catch(() => Buffer.alloc(0));
+  const stats = await stat(await locateIndex(provider)).catch(() => undefined);
   return {
     ...(headOid ? { headOid } : {}),
     ...(headName ? { headName } : {}),
     refs: refStates,
-    index: { bytes: indexBytes, sha256: sha256(indexBytes), mode: stats.mode, exists: true },
+    index: { bytes: indexBytes, sha256: sha256(indexBytes), mode: stats?.mode ?? 0o600, exists: true },
     affectedPaths,
   };
 }

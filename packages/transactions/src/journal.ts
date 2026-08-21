@@ -27,7 +27,7 @@ const maxRecordBytes = 64 * 1024;
 
 const legalEdges: Readonly<Record<JournalState, readonly JournalState[]>> = {
   Planned: ['Preflight', 'Cancelled'],
-  Preflight: ['Rejected', 'Cancelled', 'Checkpointed'],
+  Preflight: ['Rejected', 'Cancelled', 'Checkpointed', 'NeedsAttention'],
   Rejected: [],
   Cancelled: [],
   Checkpointed: ['Running', 'Cancelled'],
