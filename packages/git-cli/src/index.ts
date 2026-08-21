@@ -5,3 +5,5 @@ export * from './status.js';
 export * from './locator.js';
 export * from './log.js';
 export * from './refs.js';
+export * from './diff.js';
+export * from './content.js';
