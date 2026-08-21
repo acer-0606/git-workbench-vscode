@@ -12,3 +12,4 @@ export * from './versionVector.js';
 export * from './stage.js';
 export * from './commit.js';
 export * from './branch.js';
+export * from './stash.js';
